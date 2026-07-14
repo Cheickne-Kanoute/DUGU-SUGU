@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2Icon, CheckCircleIcon, ClockIcon, XCircleIcon, StoreIcon } from "lucide-react";
+import { Loader2Icon, ClockIcon, XCircleIcon, StoreIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Navigate } from "react-router-dom";
 
@@ -77,24 +77,22 @@ export default function BecomeSellerPage() {
 
     try {
       if (request && request.status === "rejected") {
-        // Update existing rejected request via backend (to bypass RLS restriction)
-        const { data: { session } } = await supabase.auth.getSession();
-        const token = session?.access_token;
-        
-        const res = await fetch(`${import.meta.env.VITE_API_URL || '/api'}/seller-requests/resubmit`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ message, request_id: request.id }),
-        });
-        
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Erreur lors de la soumission");
+        const { error } = await (supabase as any)
+          .from('seller_requests')
+          .update({ status: 'pending', message: message || '' })
+          .eq('id', request.id)
+          .eq('user_id', user.id)
+          .eq('status', 'rejected')
+          .select()
+          .single();
+          
+        if (error) throw new Error(error.message || "Erreur lors de la soumission");
 
         setRequest({ ...request, status: "pending", message });
         toast.success("Votre demande a été soumise à nouveau.");
       } else {
         // Create new request
-        const { data, error } = await supabase
+        const { data, error } = await (supabase as any)
           .from("seller_requests")
           .insert({
             user_id: user.id,

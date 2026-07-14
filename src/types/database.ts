@@ -282,6 +282,29 @@ export interface Database {
           created_at?: string
         }
       }
+      seller_requests: {
+        Row: {
+          id: string
+          user_id: string
+          status: 'pending' | 'approved' | 'rejected'
+          message: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          status?: 'pending' | 'approved' | 'rejected'
+          message?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          status?: 'pending' | 'approved' | 'rejected'
+          message?: string
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never

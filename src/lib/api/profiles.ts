@@ -1,4 +1,4 @@
-import { API_URL, supabase } from '../supabase';
+import { supabase } from '../supabase';
 import type { Database } from '../../types/database';
 
 export type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -7,16 +7,28 @@ export type ProfileWithAccessState = Profile & {
 };
 
 export async function getProfileById(id: string, accessToken?: string) {
-  const res = await fetch(`${API_URL}/profiles/${id}`, {
-    headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
-  });
+  // Get the public profile
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', id)
+    .single();
 
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Profile not found');
+  if (error) {
+    throw new Error(error.message || 'Profile not found');
   }
 
-  return data as ProfileWithAccessState;
+  const profileWithAccessState = { ...(data as Profile), is_blocked: false } as ProfileWithAccessState;
+
+  // Check if session is still valid (banned users will fail this check)
+  if (accessToken) {
+    const { error: authError } = await supabase.auth.getUser(accessToken);
+    if (authError) {
+      profileWithAccessState.is_blocked = true;
+    }
+  }
+
+  return profileWithAccessState;
 }
 
 export async function getSellers() {

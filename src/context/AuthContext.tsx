@@ -95,9 +95,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchProfile, signOutBlockedUser]);
 
   useEffect(() => {
-    const interval = window.setInterval(() => {
-      void refreshUser();
-    }, 15000);
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`public:profiles:id=eq.${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        () => {
+          void refreshUser();
+        }
+      )
+      .subscribe();
 
     const handleFocus = () => {
       void refreshUser();
@@ -106,10 +120,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener('focus', handleFocus);
 
     return () => {
-      window.clearInterval(interval);
+      supabase.removeChannel(channel);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [refreshUser]);
+  }, [user?.id, refreshUser]);
 
   const login = async (email: string, password: string) => {
     try {
