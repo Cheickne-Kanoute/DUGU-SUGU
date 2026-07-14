@@ -1,0 +1,258 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Montserrat:wght@400;500;600&display=swap");
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@theme inline {
+  /* Fonts */
+  --font-heading: "Inter", "Inter Variable", system-ui, sans-serif;
+  --font-body: "Montserrat", "Montserrat Variable", system-ui, sans-serif;
+  --font-family-heading: var(--font-heading);
+  --font-family-body: var(--font-body);
+
+  /* Border radius */
+  --radius-xl:  calc(var(--radius) + 4px);
+  --radius-lg:  var(--radius);
+  --radius-md:  calc(var(--radius) - 2px);
+  --radius-sm:  calc(var(--radius) - 4px);
+  --radius-xs:  calc(var(--radius) - 6px);
+
+  /* Box shadow */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+
+  /* Colors — mapped from CSS variables */
+  --color-border:      hsl(var(--border));
+  --color-input:       hsl(var(--input));
+  --color-ring:        hsl(var(--ring));
+  --color-background:  hsl(var(--background));
+  --color-foreground:  hsl(var(--foreground));
+
+  --color-primary:            hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary:            hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive:            hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted:            hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent:            hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover:            hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card:            hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-sidebar:                    hsl(var(--sidebar-background));
+  --color-sidebar-foreground:         hsl(var(--sidebar-foreground));
+  --color-sidebar-primary:            hsl(var(--sidebar-primary));
+  --color-sidebar-primary-foreground: hsl(var(--sidebar-primary-foreground));
+  --color-sidebar-accent:             hsl(var(--sidebar-accent));
+  --color-sidebar-accent-foreground:  hsl(var(--sidebar-accent-foreground));
+  --color-sidebar-border:             hsl(var(--sidebar-border));
+  --color-sidebar-ring:               hsl(var(--sidebar-ring));
+
+  /* Animations */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up:   accordion-up 0.2s ease-out;
+  --animate-caret-blink:    caret-blink 1.25s ease-out infinite;
+}
+
+@layer base {
+  :root {
+    --font-heading: "Inter", "Inter Variable", system-ui, sans-serif;
+    --font-body: "Montserrat", "Montserrat Variable", system-ui, sans-serif;
+
+    --background: 45 40% 97%;
+    --foreground: 222 18% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 18% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 18% 14%;
+    --primary: 142 58% 28%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 138 28% 94%;
+    --secondary-foreground: 222 18% 14%;
+    --muted: 42 20% 94%;
+    --muted-foreground: 222 9% 42%;
+    --accent: 140 36% 92%;
+    --accent-foreground: 222 18% 14%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 40 18% 84%;
+    --input: 40 18% 84%;
+    --ring: 142 58% 28%;
+    --radius: 0.75rem;
+
+    --sidebar-background: 140 48% 18%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 142 58% 28%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 140 30% 24%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 140 26% 26%;
+    --sidebar-ring: 142 58% 35%;
+
+    /* Dashboard KPI Semantic Colors */
+    --kpi-revenue: 262 83% 58%;
+    --kpi-orders: 217 91% 60%;
+    --kpi-positive: 142 71% 45%;
+    --kpi-warning: 38 92% 50%;
+    --kpi-danger: 0 84% 60%;
+  }
+
+  .dark {
+    --background: 222 20% 9%;
+    --foreground: 0 0% 98%;
+    --card: 222 20% 10%;
+    --card-foreground: 0 0% 98%;
+    --popover: 222 20% 10%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 142 58% 36%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 222 16% 16%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 222 16% 16%;
+    --muted-foreground: 220 10% 68%;
+    --accent: 140 22% 18%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 222 16% 18%;
+    --input: 222 16% 18%;
+    --ring: 142 58% 36%;
+
+    --sidebar-background: 140 48% 12%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 142 58% 36%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 140 28% 18%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 140 24% 18%;
+    --sidebar-ring: 142 58% 42%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    text-rendering: optimizeLegibility;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    letter-spacing: -0.02em;
+  }
+}
+
+@layer components {
+  .app-page {
+    @apply relative z-10 min-h-screen pt-[72px];
+    background: linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 58%, hsl(var(--muted)) 100%);
+  }
+
+  .app-shell {
+    @apply mx-auto w-full max-w-[1280px] px-6;
+  }
+
+  .section-title {
+    @apply text-balance text-3xl font-medium tracking-tight text-primary md:text-4xl;
+    font-family: var(--font-heading);
+  }
+
+  .page-title {
+    @apply text-balance text-2xl font-medium tracking-tight text-primary md:text-[32px];
+    font-family: var(--font-heading);
+  }
+
+  .section-lead {
+    @apply text-base leading-relaxed text-muted-foreground;
+  }
+
+  .brand-button {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:pointer-events-none disabled:opacity-60;
+  }
+
+  .brand-button-outline {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-primary/20 bg-background px-5 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5 disabled:pointer-events-none disabled:opacity-60;
+  }
+
+  .field-control {
+    @apply h-12 w-full rounded-xl border border-input bg-background px-4 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:bg-muted/60 disabled:text-muted-foreground;
+  }
+
+  .field-control-sm {
+    @apply h-10 w-full rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/15 disabled:bg-muted/60 disabled:text-muted-foreground;
+  }
+
+  .field-label {
+    @apply text-sm font-medium text-foreground;
+  }
+
+  .brand-badge {
+    @apply inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-[11px] font-medium text-primary;
+  }
+}
+
+@layer utilities {
+  /* Map legacy hex colors to CSS variables */
+  [class*="text-[#1a1a1a]"] { color: hsl(var(--foreground)) !important; }
+  [class*="text-[#555544]"],
+  [class*="text-[#888877]"] { color: hsl(var(--muted-foreground)) !important; }
+  [class*="text-[#166534]"],
+  [class*="border-[#166534]"] {
+    color: hsl(var(--primary)) !important;
+    border-color: hsl(var(--primary)) !important;
+  }
+  [class*="bg-[#166534]"]       { background-color: hsl(var(--primary)) !important; }
+  [class*="hover:bg-[#14532d]"]:hover { background-color: hsl(var(--primary) / 0.9) !important; }
+  [class*="bg-[#d4a017]"],
+  [class*="text-[#d4a017]"],
+  [class*="fill-[#d4a017]"] {
+    color: hsl(40 90% 35%) !important;
+    fill: hsl(40 90% 35%) !important;
+    background-color: hsl(40 90% 35%) !important;
+  }
+  [class*="bg-[#f8f6f0]"],
+  [class*="bg-[#e8e6d4]"]  { background-color: hsl(var(--background)) !important; }
+  [class*="border-[#e0dec8]"]   { border-color: hsl(var(--border)) !important; }
+  [class*="bg-[#1a1a1a]"]       { background-color: hsl(var(--foreground)) !important; }
+  [class*="bg-[#22c55e]"]       { background-color: hsl(var(--primary)) !important; }
+  [class*="from-[#166534]"] {
+    --tw-gradient-from: hsl(var(--primary)) var(--tw-gradient-from-position) !important;
+    --tw-gradient-to: hsl(var(--primary) / 0) var(--tw-gradient-to-position) !important;
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+  }
+  [class*="to-[#22c55e]"] {
+    --tw-gradient-to: hsl(var(--primary) / 0.92) var(--tw-gradient-to-position) !important;
+  }
+
+  /* Custom animations */
+  @keyframes count-up {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: none; }
+  }
+  @keyframes pulse-badge {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
+  }
+  .animate-count-up   { animation: count-up 0.4s ease-out forwards; }
+  .animate-pulse-badge { animation: pulse-badge 1.5s ease-in-out infinite; }
+
+  /* Hide scrollbar */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
