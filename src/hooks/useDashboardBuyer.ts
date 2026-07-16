@@ -68,7 +68,7 @@ export function useDashboardBuyer() {
                 id,
                 name,
                 price,
-                image
+                images
               )
             `)
             .eq('user_id', user!.id)
