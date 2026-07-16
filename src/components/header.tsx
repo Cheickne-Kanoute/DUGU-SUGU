@@ -15,10 +15,6 @@ export const navLinks = [
 		label: "Vendeurs",
 		href: "/sellers",
 	},
-	{
-		label: "À propos",
-		href: "/about",
-	},
 ];
 
 import { useAuth } from "@/context/AuthContext";
