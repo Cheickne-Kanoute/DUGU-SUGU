@@ -84,7 +84,7 @@ export interface Database {
           name: string
           description: string
           price: number
-          image: string
+          images: string[]
           stock: number
           unit: string
           is_bio: boolean
@@ -100,7 +100,7 @@ export interface Database {
           name: string
           description: string
           price: number
-          image: string
+          images: string[]
           stock?: number
           unit: string
           is_bio?: boolean
@@ -116,7 +116,7 @@ export interface Database {
           name?: string
           description?: string
           price?: number
-          image?: string
+          images?: string[]
           stock?: number
           unit?: string
           is_bio?: boolean

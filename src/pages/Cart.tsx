@@ -60,7 +60,7 @@ export default function Cart() {
                   >
                     <Link to={`/product/${item.product.id}`} className="shrink-0">
                       <img
-                        src={item.product.image}
+                        src={item.product.images?.[0] || ""}
                         alt={item.product.name}
                         className="w-20 h-20 rounded-lg object-cover"
                       />

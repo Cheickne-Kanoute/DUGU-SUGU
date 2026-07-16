@@ -20,7 +20,7 @@ interface Product {
   available: boolean;
   category: { id: string; name: string };
   seller: { id: string; full_name: string };
-  image: string;
+  images: string[];
 }
 
 export default function AdminProducts() {
@@ -165,7 +165,7 @@ export default function AdminProducts() {
                 ) : products.map(p => (
                   <tr key={p.id} className="border-b border-border/30 hover:bg-muted/20">
                     <td className="p-4">
-                      <img src={p.image || 'https://placehold.co/100x100?text=No+Image'} alt={p.name} className="size-10 rounded-md object-cover" />
+                      <img src={p.images?.[0] || 'https://placehold.co/100x100?text=No+Image'} alt={p.name} className="size-10 rounded-md object-cover" />
                     </td>
                     <td className="p-4">
                       <p className="font-medium">{p.name}</p>

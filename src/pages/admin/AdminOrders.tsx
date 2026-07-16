@@ -24,7 +24,7 @@ interface Order {
     id: string;
     quantity: number;
     price_at_time: number;
-    product: { id: string; name: string; image: string };
+    product: { id: string; name: string; images: string[] };
   }[];
 }
 
@@ -215,8 +215,8 @@ export default function AdminOrders() {
                 {selectedOrder.items.map((item) => (
                   <div key={item.id} className="flex items-center gap-4 border-b border-border/50 pb-4 last:border-0 last:pb-0">
                     <div className="size-16 rounded-lg bg-muted flex-shrink-0 overflow-hidden border border-border/50">
-                      {item.product?.image ? (
-                        <img src={item.product.image} alt={item.product.name} className="w-full h-full object-cover" />
+                      {item.product?.images && item.product.images.length > 0 ? (
+                        <img src={item.product.images[0]} alt={item.product.name} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <PackageIcon className="size-6 text-muted-foreground/50" />

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getOrders, type Order } from "@/lib/api/orders";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { DashboardSectionHeader } from "@/components/dashboard/shared/DashboardSectionHeader";
 import { OrderStatusBadge } from "@/components/dashboard/shared/OrderStatusBadge";
 import { formatDistanceToNow } from "date-fns";
@@ -182,8 +182,8 @@ export default function ClientOrdersPage() {
                   {selectedOrder.items?.map((item: any) => (
                     <div key={item.id} className="flex gap-3">
                       <div className="h-12 w-12 rounded bg-muted flex items-center justify-center shrink-0">
-                        {item.product?.image ? (
-                          <img src={item.product.image} alt={item.product.name} className="h-full w-full object-cover rounded" />
+                        {item.product?.images && item.product.images.length > 0 ? (
+                          <img src={item.product.images[0]} alt={item.product.name} className="h-full w-full object-cover rounded" />
                         ) : (
                           <PackageIcon className="h-6 w-6 text-muted-foreground" />
                         )}

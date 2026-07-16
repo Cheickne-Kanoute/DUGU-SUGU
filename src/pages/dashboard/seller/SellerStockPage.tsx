@@ -162,8 +162,8 @@ export default function SellerStockPage() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border bg-muted">
-                            {product.image ? (
-                              <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+                            {product.images && product.images.length > 0 ? (
+                              <img src={product.images[0]} alt={product.name} className="h-full w-full object-cover" />
                             ) : null}
                           </div>
                           <div className="min-w-0">

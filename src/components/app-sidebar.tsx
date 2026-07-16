@@ -1,6 +1,6 @@
 "use client";
 
-import { LogoIcon } from "@/components/logo";
+import { Logo } from "@/components/logo";
 import {
 	Sidebar,
 	SidebarContent,
@@ -15,7 +15,7 @@ import { clientNavGroups, sellerNavGroups, adminNavGroups } from "@/components/a
 import { useAuth } from "@/context/AuthContext";
 import { Link, useNavigate } from "react-router-dom";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOutIcon, ShieldIcon } from "lucide-react";
+import { LogOutIcon } from "lucide-react";
 
 export function AppSidebar() {
 	const { user, logout } = useAuth();
@@ -40,8 +40,7 @@ export function AppSidebar() {
 		<Sidebar collapsible="icon" variant="floating">
 			<SidebarHeader className="h-14 justify-center">
 				<SidebarMenuButton render={<Link to="/" />}>
-					<LogoIcon />
-					<span className="font-medium">DUGU SUGU</span>
+					<Logo className="text-2xl text-white" />
 				</SidebarMenuButton>
 			</SidebarHeader>
 

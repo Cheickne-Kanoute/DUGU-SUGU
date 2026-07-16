@@ -24,9 +24,9 @@ export function BuyerFavorites({ favorites }: BuyerFavoritesProps) {
                 className="group relative flex flex-col border rounded-lg overflow-hidden hover:border-primary/50 transition-colors"
               >
                 <div className="aspect-square bg-muted w-full relative">
-                  {fav.product?.image ? (
+                  {fav.product?.images && fav.product.images.length > 0 ? (
                     <img 
-                      src={fav.product.image} 
+                      src={fav.product.images?.[0] || ""} 
                       alt={fav.product.name} 
                       className="object-cover w-full h-full"
                     />

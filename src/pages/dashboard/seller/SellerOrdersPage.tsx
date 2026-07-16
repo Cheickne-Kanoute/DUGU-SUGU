@@ -215,8 +215,8 @@ export default function SellerOrdersPage() {
                   {selectedOrder.items?.map((item: any) => (
                     <div key={item.id} className="flex gap-3">
                       <div className="h-12 w-12 rounded bg-muted flex items-center justify-center shrink-0">
-                        {item.product?.image ? (
-                          <img src={item.product.image} alt={item.product.name} className="h-full w-full object-cover rounded" />
+                        {item.product?.images && item.product.images.length > 0 ? (
+                          <img src={item.product.images[0]} alt={item.product.name} className="h-full w-full object-cover rounded" />
                         ) : (
                           <PackageIcon className="h-6 w-6 text-muted-foreground" />
                         )}

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Heart, Search } from 'lucide-react';
+import { ShoppingCart, Heart } from 'lucide-react';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useCart } from '@/hooks/useCart';
 import { toast } from 'sonner';
@@ -65,7 +65,7 @@ export default function ClientFavoritesPage() {
               >
                 <Link to={`/product/${product.id}`} className="block shrink-0 overflow-hidden relative">
                   <img
-                    src={product.image}
+                    src={product.images?.[0] || ""}
                     alt={product.name}
                     className="w-full h-40 sm:h-48 object-cover transition-transform hover:scale-105 duration-500"
                   />

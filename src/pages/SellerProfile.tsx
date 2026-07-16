@@ -181,7 +181,7 @@ export default function SellerProfile() {
                   >
                     <Link to={`/product/${product.id}`} className="block overflow-hidden">
                       <img
-                        src={product.image}
+                        src={product.images?.[0] || ""}
                         alt={product.name}
                         className="w-full aspect-[4/3] object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                       />

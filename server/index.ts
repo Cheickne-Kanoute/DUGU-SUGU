@@ -420,7 +420,7 @@ app.get('/api/admin/orders', adminOnly, async (req, res) => {
     const { status, page = 1, limit = 20 } = req.query;
     let query = supabase
       .from('orders')
-      .select('*, buyer:profiles!buyer_id(id, full_name, email), seller:profiles!seller_id(id, full_name), items:order_items(*, product:products(id, name, image))', { count: 'exact' })
+      .select('*, buyer:profiles!buyer_id(id, full_name, email), seller:profiles!seller_id(id, full_name), items:order_items(*, product:products(id, name, images))', { count: 'exact' })
       .order('created_at', { ascending: false });
 
     if (status && status !== 'all') query = query.eq('status', status as string);

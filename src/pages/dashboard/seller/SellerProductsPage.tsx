@@ -10,8 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
 import { createProduct, deleteProduct, updateProduct, type Product } from "@/lib/api/products";
+import { uploadProductImages } from "@/lib/api/upload";
 import { supabase } from "@/lib/supabase";
-import { Loader2Icon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { Loader2Icon, PencilIcon, PlusIcon, Trash2Icon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -25,7 +26,8 @@ type ProductFormState = {
   name: string;
   description: string;
   price: string;
-  image: string;
+  images: string[];
+
   stock: string;
   unit: string;
   low_stock_threshold: string;
@@ -36,7 +38,7 @@ const initialForm = (categoryId = ""): ProductFormState => ({
   name: "",
   description: "",
   price: "",
-  image: "",
+  images: [],
   stock: "0",
   unit: "kg",
   low_stock_threshold: "10",
@@ -53,7 +55,7 @@ const toFormState = (product: Product): ProductFormState => ({
   name: product.name,
   description: product.description,
   price: String(product.price ?? ""),
-  image: product.image,
+  images: product.images || [],
   stock: String(product.stock ?? 0),
   unit: product.unit ?? "kg",
   low_stock_threshold: String(product.low_stock_threshold ?? 10),
@@ -69,6 +71,7 @@ export default function SellerProductsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form, setForm] = useState<ProductFormState>(initialForm());
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   const categoryLabelById = useMemo(
     () => new Map(categories.map((category) => [category.id, category.name])),
@@ -82,9 +85,9 @@ export default function SellerProductsPage() {
       !!form.name.trim() &&
       !!form.description.trim() &&
       !!form.price &&
-      !!form.image.trim() &&
+      (form.images.length > 0 || selectedFiles.length > 0) &&
       !!form.unit.trim(),
-    [form, user?.id]
+    [form, selectedFiles, user?.id]
   );
 
   useEffect(() => {
@@ -129,12 +132,14 @@ export default function SellerProductsPage() {
   const openCreate = () => {
     setEditingProduct(null);
     setForm(initialForm(categories[0]?.id || ""));
+    setSelectedFiles([]);
     setFormOpen(true);
   };
 
   const openEdit = (product: Product) => {
     setEditingProduct(product);
     setForm(toFormState(product));
+    setSelectedFiles([]);
     setFormOpen(true);
   };
 
@@ -142,6 +147,7 @@ export default function SellerProductsPage() {
     setFormOpen(false);
     setEditingProduct(null);
     setForm(initialForm(categories[0]?.id || ""));
+    setSelectedFiles([]);
   };
 
   const handleSave = async () => {
@@ -149,13 +155,18 @@ export default function SellerProductsPage() {
 
     setSaving(true);
     try {
+      let uploadedUrls: string[] = [];
+      if (selectedFiles.length > 0) {
+        uploadedUrls = await uploadProductImages(selectedFiles);
+      }
+
       const payload = {
         seller_id: user.id,
         category_id: form.category_id,
         name: form.name.trim(),
         description: form.description.trim(),
         price: Number(form.price),
-        image: form.image.trim(),
+        images: [...form.images, ...uploadedUrls],
         stock: Number(form.stock || 0),
         unit: form.unit.trim(),
         low_stock_threshold: Number(form.low_stock_threshold || 10),
@@ -253,8 +264,8 @@ export default function SellerProductsPage() {
                       <TableCell>
                         <div className="flex items-center gap-3">
                           <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border bg-muted">
-                            {product.image ? (
-                              <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+                            {product.images && product.images.length > 0 ? (
+                              <img src={product.images[0]} alt={product.name} className="h-full w-full object-cover" />
                             ) : null}
                           </div>
                           <div className="min-w-0">
@@ -312,7 +323,7 @@ export default function SellerProductsPage() {
               <Label>Categorie</Label>
               <Select
                 value={form.category_id}
-                onValueChange={(value) => setForm((current) => ({ ...current, category_id: value }))}
+                onValueChange={(value) => setForm((current) => ({ ...current, category_id: value || "" }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Choisir une categorie" />
@@ -385,10 +396,41 @@ export default function SellerProductsPage() {
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <Label>Image URL</Label>
+              <Label>Images du produit</Label>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {form.images.map((img, idx) => (
+                  <div key={idx} className="relative h-16 w-16 border rounded overflow-hidden group">
+                    <img src={img} alt="preview" className="h-full w-full object-cover" />
+                    <button
+                      className="absolute top-0 right-0 bg-destructive text-destructive-foreground p-0.5"
+                      onClick={() => setForm(c => ({ ...c, images: c.images.filter((_, i) => i !== idx) }))}
+                    >
+                      <XIcon className="size-3" />
+                    </button>
+                  </div>
+                ))}
+                {selectedFiles.map((file, idx) => (
+                  <div key={idx} className="relative h-16 w-16 border rounded overflow-hidden group">
+                    <img src={URL.createObjectURL(file)} alt="preview" className="h-full w-full object-cover opacity-70" />
+                    <button
+                      className="absolute top-0 right-0 bg-destructive text-destructive-foreground p-0.5"
+                      onClick={() => setSelectedFiles(c => c.filter((_, i) => i !== idx))}
+                    >
+                      <XIcon className="size-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
               <Input
-                value={form.image}
-                onChange={(e) => setForm((current) => ({ ...current, image: e.target.value }))}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  if (e.target.files) {
+                    setSelectedFiles(c => [...c, ...Array.from(e.target.files!)]);
+                  }
+                  e.target.value = "";
+                }}
               />
             </div>
 

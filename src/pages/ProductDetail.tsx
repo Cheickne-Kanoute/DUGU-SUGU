@@ -16,6 +16,7 @@ export default function ProductDetail() {
   const [quantity, setQuantity] = useState(1);
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   useEffect(() => {
     async function loadProduct() {
@@ -105,14 +106,29 @@ export default function ProductDetail() {
         {/* Product Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
           {/* Left - Image */}
-          <div>
+          <div className="flex flex-col gap-4">
             <div className="bg-white rounded-2xl overflow-hidden shadow-[0_4px_20px_rgba(0,0,0,0.08)]">
               <img
-                src={product.image}
+                src={product.images?.[activeImageIndex] || ""}
                 alt={product.name}
                 className="w-full aspect-[4/3] object-cover"
               />
             </div>
+            {product.images && product.images.length > 1 && (
+              <div className="flex gap-4 overflow-x-auto pb-2">
+                {product.images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setActiveImageIndex(idx)}
+                    className={`shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition-colors ${
+                      activeImageIndex === idx ? 'border-[#166534]' : 'border-transparent hover:border-[#166534]/50'
+                    }`}
+                  >
+                    <img src={img} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Right - Info */}
@@ -257,7 +273,7 @@ export default function ProductDetail() {
                   className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_32px_rgba(0,0,0,0.12)] hover:-translate-y-1 group"
                 >
                   <img
-                    src={p.image}
+                    src={p.images?.[0] || ""}
                     alt={p.name}
                     className="w-full aspect-[4/3] object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                   />

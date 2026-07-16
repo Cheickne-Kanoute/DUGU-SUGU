@@ -1,7 +1,6 @@
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ArrowRightIcon, PhoneCallIcon } from "lucide-react";
-import { LogoCloud } from "@/components/logo-cloud";
 
 export function HeroSection() {
 	return (
@@ -73,7 +72,6 @@ export function HeroSection() {
 					</Button>
 				</div>
 			</div>
-			<LogoCloud />
 		</section>
 	);
 }

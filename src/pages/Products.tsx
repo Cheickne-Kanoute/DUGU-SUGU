@@ -155,7 +155,7 @@ export default function Products() {
 
           {/* Category Select */}
           <div className="w-full sm:w-[250px]">
-            <Select value={category} onValueChange={setCategory}>
+            <Select value={category} onValueChange={(val) => setCategory(val || "")}>
               <SelectTrigger className="h-11 bg-white border-[#e0dec8] focus:ring-[#166534]">
                 <SelectValue placeholder="Toutes les Catégories" />
               </SelectTrigger>
@@ -206,7 +206,7 @@ export default function Products() {
                 >
                   <Link to={`/product/${product.id}`} className="block shrink-0 overflow-hidden relative">
                     <img
-                      src={product.image}
+                      src={product.images?.[0] || ""}
                       alt={product.name}
                       className="w-full h-40 sm:h-48 object-cover transition-transform hover:scale-105 duration-500"
                     />

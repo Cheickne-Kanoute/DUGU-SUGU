@@ -174,7 +174,7 @@ export default function Checkout() {
               <div className="max-h-[240px] overflow-y-auto mb-4 pr-2 space-y-3">
                 {items.map((item) => item.product && (
                   <div key={item.id} className="flex gap-3 items-center">
-                    <img src={item.product.image} alt={item.product.name} className="w-12 h-12 rounded object-cover" />
+                    <img src={item.product.images?.[0] || ""} alt={item.product.name} className="w-12 h-12 rounded object-cover" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-[#1a1a1a] truncate">{item.product.name}</p>
                       <p className="text-xs text-[#888877]">Qté: {item.quantity}</p>
