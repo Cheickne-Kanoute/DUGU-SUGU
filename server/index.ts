@@ -365,6 +365,11 @@ app.patch('/api/admin/seller-requests/:id', adminOnly, async (req, res) => {
         message: 'Félicitations ! Votre demande pour devenir vendeur a été approuvée.',
         link: '/dashboard',
       });
+      
+      const { data: profile } = await supabase.from('profiles').select('email').eq('id', user_id).single();
+      if (profile?.email) {
+        await sendSellerStatusEmail(profile.email, 'approved');
+      }
     } else if (status === 'rejected' && user_id) {
       await supabase.from('notifications').insert({
         user_id,
@@ -372,6 +377,11 @@ app.patch('/api/admin/seller-requests/:id', adminOnly, async (req, res) => {
         title: 'Demande vendeur refusée',
         message: 'Votre demande pour devenir vendeur a été refusée.',
       });
+      
+      const { data: profile } = await supabase.from('profiles').select('email').eq('id', user_id).single();
+      if (profile?.email) {
+        await sendSellerStatusEmail(profile.email, 'rejected');
+      }
     }
 
     res.json({ success: true });
@@ -435,6 +445,103 @@ app.get('/api/admin/orders', adminOnly, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// ---- EMAILS (TRANSACTIONAL) ----
+import { 
+  sendOrderConfirmationEmail, 
+  sendSellerStatusEmail, 
+  sendSellerRequestAcknowledgmentEmail, 
+  sendNewSellerRequestAlertEmail,
+  sendNewOrderToSellerEmail,
+  sendOrderStatusEmail
+} from './email';
+
+// Route pour l'envoi d'un email de confirmation de commande
+app.post('/api/email/order-confirmation', async (req, res) => {
+  try {
+    // En production, ces données viendraient du payload du webhook Stripe ou de la BDD
+    const { email, customerName, orderId, totalAmount } = req.body;
+
+    if (!email || !customerName || !orderId || !totalAmount) {
+      return res.status(400).json({ error: 'Données manquantes (email, customerName, orderId, totalAmount)' });
+    }
+
+    const result = await sendOrderConfirmationEmail(email, customerName, orderId, totalAmount);
+
+    if (!result.success) {
+      return res.status(500).json({ error: "Erreur lors de l'envoi de l'email", details: result.error });
+    }
+
+    res.json({ success: true, message: 'Email envoyé avec succès', data: result.data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Route pour notifier le client d'un changement de statut
+app.post('/api/email/order-status-update', async (req, res) => {
+  try {
+    const { buyerEmail, buyerName, sellerName, orderId, newStatus } = req.body;
+
+    if (!buyerEmail || !buyerName || !sellerName || !orderId || !newStatus) {
+      return res.status(400).json({ error: 'Données manquantes' });
+    }
+
+    const result = await sendOrderStatusEmail(buyerEmail, buyerName, sellerName, orderId, newStatus);
+
+    if (!result.success) {
+      return res.status(500).json({ error: "Erreur lors de l'envoi de l'email de statut", details: result.error });
+    }
+
+    res.json({ success: true, message: 'Email statut envoyé avec succès', data: result.data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Route pour notifier le vendeur d'une nouvelle commande
+app.post('/api/email/new-order-seller', async (req, res) => {
+  try {
+    const { sellerEmail, sellerName, customerName, orderId, totalAmount } = req.body;
+
+    if (!sellerEmail || !sellerName || !customerName || !orderId || totalAmount === undefined) {
+      return res.status(400).json({ error: 'Données manquantes' });
+    }
+
+    const result = await sendNewOrderToSellerEmail(sellerEmail, sellerName, customerName, orderId, totalAmount);
+
+    if (!result.success) {
+      return res.status(500).json({ error: "Erreur lors de l'envoi de l'email au vendeur", details: result.error });
+    }
+
+    res.json({ success: true, message: 'Email vendeur envoyé avec succès', data: result.data });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// Route pour notifier la création d'une demande vendeur (client + admin)
+app.post('/api/email/seller-request-submitted', async (req, res) => {
+  try {
+    const { email, customerName } = req.body;
+
+    if (!email || !customerName) {
+      return res.status(400).json({ error: 'Données manquantes (email, customerName)' });
+    }
+
+    // 1. Envoyer l'accusé de réception au client
+    await sendSellerRequestAcknowledgmentEmail(email, customerName);
+
+    // 2. Envoyer l'alerte à l'administrateur
+    await sendNewSellerRequestAlertEmail(customerName, email);
+
+    res.json({ success: true, message: 'Emails envoyés avec succès' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // Health check
 app.get('/api/health', (req, res) => {

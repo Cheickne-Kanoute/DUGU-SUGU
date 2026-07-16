@@ -55,6 +55,23 @@ export default function SellerOrdersPage() {
         setSelectedOrder({ ...selectedOrder, status: newStatus });
       }
 
+      // Envoyer un email de notification au client
+      const orderToUpdate = orders.find(o => o.id === orderId);
+      if (orderToUpdate?.buyer?.email) {
+        const API_BASE = import.meta.env.VITE_API_URL || '/api';
+        fetch(`${API_BASE}/email/order-status-update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            buyerEmail: orderToUpdate.buyer.email,
+            buyerName: orderToUpdate.buyer.full_name || 'Client',
+            sellerName: user?.full_name || 'Votre vendeur',
+            orderId: orderId,
+            newStatus: newStatus
+          })
+        }).catch(console.error);
+      }
+
       toast.success(newStatus === "cancelled" ? "Commande annulée" : "Statut mis à jour");
     } catch (err: any) {
       toast.error(err.message || "Erreur de mise à jour");

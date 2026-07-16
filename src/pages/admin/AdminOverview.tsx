@@ -91,7 +91,7 @@ export default function AdminOverview() {
       {error && (
         <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <AlertCircleIcon className="size-4 shrink-0" />
-          <span>{error}</span>
+          <span>{typeof error === 'string' ? error : (error?.message || JSON.stringify(error))}</span>
         </div>
       )}
 

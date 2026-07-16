@@ -190,7 +190,7 @@ export default function SellerProfile() {
                       <Link to={`/product/${product.id}`}>
                         <h3 className="text-base font-semibold text-[#1a1a1a] line-clamp-1">{product.name}</h3>
                       </Link>
-                      <p className="text-lg font-bold text-[#166534] mt-2">{product.price.toLocaleString()} FCFA</p>
+                      <p className="text-lg font-bold text-[#166534] mt-2">{product.price.toLocaleString('fr-FR')} FCFA</p>
                       {cartItem ? (
                         <div className="mt-3 flex items-center justify-between rounded-full border border-[#e0dec8] bg-[#f8f6f0] px-3 py-2">
                           <span className="text-xs text-[#888877]">Dans le panier</span>

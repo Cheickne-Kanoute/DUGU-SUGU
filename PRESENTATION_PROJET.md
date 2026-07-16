@@ -157,6 +157,15 @@ Ce serveur permet de :
 - Traiter les Webhooks (ex: notifications de paiement externe).
 Le serveur utilise `morgan` pour le logging des requêtes et `cors` pour la sécurité inter-domaines.
 
+### 6.1. Gestion des Emails Transactionnels (Nodemailer & Gmail SMTP)
+Le service d'email intégré par défaut dans Supabase est soumis à des limites strictes (ex: 3 emails par heure pour les inscriptions). De plus, la plupart des services cloud d'envoi d'emails imposent désormais des restrictions très lourdes (blocages d'envoi vers des adresses non vérifiées sans la possession d'un nom de domaine personnalisé).
+Pour résoudre ce problème de manière robuste, gratuite, et sans configuration DNS complexe, nous avons intégré **Nodemailer** couplé au relais SMTP de **Gmail** via un mot de passe d'application sécurisé.
+Cette architecture permet à notre serveur Node.js/Express d'envoyer des notifications transactionnelles en temps réel vers n'importe quelle adresse, telles que :
+- Alertes de soumission, d'approbation ou de rejet des demandes d'accès vendeurs.
+- Reçus et confirmations de commande pour les clients.
+- **Alertes instantanées de nouvelles commandes** pour avertir les vendeurs qu'ils ont des articles à préparer.
+- **Suivi d'expédition** envoyant automatiquement un email aux acheteurs lorsque le vendeur modifie le statut d'une commande (Expédiée, Annulée, etc.).
+
 ---
 
 ## 7. Gestion de Projet, Outillage et CI/CD
@@ -211,3 +220,36 @@ La conception de **Dugu Sugu** a permis de mettre en pratique des concepts avanc
 
 ### Q9. Comment gérez-vous le panier pour un visiteur qui n'a pas encore créé de compte ?
 **Réponse :** "Pour ne pas frustrer l'utilisateur et encourager la conversion, le visiteur peut ajouter des articles au panier sans être connecté. Ces données sont stockées dans le navigateur via le `localStorage`. Cependant, la page de validation (`/checkout`) est bloquée par la vérification de l'authentification. Dès que le visiteur se connecte ou s'inscrit, le contexte d'authentification (`AuthContext`) détecte son rôle 'client' et exécute une fonction asynchrone `syncCartToDb` qui transfère automatiquement tous les articles locaux vers la base de données Supabase. Le panier local est ensuite purgé."
+
+### Q10. Pourquoi avez-vous opté pour Nodemailer et Gmail au lieu du service par défaut de Supabase ou d'une autre plateforme cloud tierce ?
+**Réponse :** "Le service natif de Supabase nous limitait à 3 emails par heure, un goulot d'étranglement inacceptable pour tester les inscriptions et l'activité de la plateforme. Quant aux services cloud spécialisés, leurs politiques strictes anti-spam imposent désormais l'achat et la configuration d'un nom de domaine validé pour envoyer des emails librement. Pour ce MVP de fin d'études, l'implémentation de **Nodemailer** connecté via SMTP à un compte **Gmail** professionnel s'est révélée idéale. C'est une solution robuste, instantanée, sans frais, qui garantit une excellente délivrabilité pour nos envois massifs de notifications en temps réel (création de compte, reçus d'achats, et suivi des statuts de commande)."
+
+### Q11. Comment avez-vous résolu l'erreur ("Cannot coerce result to a single JSON object") lors de la soumission d'une candidature vendeur ?
+**Réponse :** "C'est une situation très courante dans l'écosystème Supabase causée par le système de sécurité Row Level Security (RLS). L'application React tentait d'exécuter un `.update().single()` pour remettre à jour le statut d'une demande précédemment refusée. Bien que le code frontend fût correct, la base de données refusait l'opération silencieusement car l'utilisateur ne disposait pas des droits de modification (UPDATE) sur la table `seller_requests` — il n'avait que les droits de lecture et d'insertion. Le retour était donc nul (0 ligne), provoquant l'erreur du `single()`. La résolution a consisté à ajouter une simple politique SQL (`CREATE POLICY`) autorisant l'utilisateur à modifier ses propres enregistrements."
+
+### Q12. Pourquoi utiliser l'API Context de React (`AuthContext`, `CartContext`) plutôt qu'une librairie externe comme Redux ou Zustand ?
+**Réponse :** "L'API Context native de React est largement suffisante pour les besoins de Dugu Sugu. Redux introduit beaucoup de code *boilerplate* (actions, reducers, store) qui ralentit le développement d'un MVP. Pour gérer l'état de l'utilisateur connecté ou les articles dans le panier à travers toute l'application, des hooks personnalisés combinés à l'API Context offrent une architecture claire, légère et facile à maintenir."
+
+### Q13. Comment gérez-vous la sécurité des mots de passe des utilisateurs ?
+**Réponse :** "Nous ne stockons jamais les mots de passe en clair. Dugu Sugu délègue l'authentification au module GoTrue intégré à Supabase. Lors de l'inscription, le mot de passe est crypté via l'algorithme de hachage robuste `bcrypt` avec un 'sel' (salt) unique avant d'être sauvegardé dans un schéma interne ultra-sécurisé de PostgreSQL (`auth.users`), auquel même l'API publique n'a pas accès."
+
+### Q14. Que se passe-t-il si deux clients tentent d'acheter le dernier article en stock exactement au même moment ?
+**Réponse :** "C'est ce qu'on appelle une condition de concurrence (*Race Condition*). Grâce à PostgreSQL, nos mises à jour de stock sont atomiques. Si deux processus tentent de diminuer le stock simultanément, la base de données mettra la ligne de produit en 'verrou' (Lock) le temps de traiter la première transaction. De plus, une contrainte SQL empêchant le stock d'être négatif (`CHECK (stock >= 0)`) ferait échouer la deuxième transaction, protégeant ainsi l'intégrité des ventes."
+
+### Q15. Pourquoi avez-vous choisi Vite comme outil de build plutôt que Create React App (CRA) ou Webpack ?
+**Réponse :** "Create React App est obsolète et son temps de compilation sur de gros projets est extrêmement long. Vite utilise les modules ES natifs du navigateur (ESM) en développement, ce qui signifie que le serveur démarre presque instantanément, peu importe la taille du projet. De plus, le *Hot Module Replacement* (HMR) de Vite est fulgurant, ce qui accélère considérablement notre vitesse de développement de l'interface."
+
+### Q16. Comment est géré le système de navigation et d'accès aux pages (Routing) ?
+**Réponse :** "Le routing est géré par `React Router DOM`. Pour protéger les tableaux de bord (Vendeur et Admin), nous avons développé un composant `ProtectedRoute`. Ce composant agit comme un intercepteur (Middleware) : il vérifie l'état d'authentification (`isAuthenticated`) et le `role` de l'utilisateur. Si un client simple tente d'accéder à `/seller/dashboard`, il est automatiquement redirigé vers la page d'accueil ou une page d'accès refusé."
+
+### Q17. Quelle a été votre stratégie pour l'optimisation sur mobile (Responsive Design) ?
+**Réponse :** "Nous avons adopté une approche *Mobile-First*. Nous construisons d'abord l'interface pour les petits écrans (smartphones), puis nous ajoutons des points de rupture Tailwind (ex: `md:flex-row`, `lg:grid-cols-4`) pour adapter l'affichage sur tablette et ordinateur. De nombreux composants, comme les barres de navigation ou les modales, adaptent dynamiquement leur comportement selon l'espace disponible (menu hamburger sur mobile vs menu horizontal sur desktop)."
+
+### Q18. Comment est géré le calcul total du prix du panier ? Un client pourrait-il manipuler le prix dans son navigateur ?
+**Réponse :** "Le total affiché dans le navigateur n'est qu'indicatif. Lors de la validation de la commande (Checkout), c'est le Backend (ou la base de données) qui doit faire foi. Les prix sont toujours enregistrés ou recalculés à partir de la table `products` pour éviter qu'un utilisateur malveillant modifie la charge utile HTTP (payload) pour payer 0€. Les données critiques ne doivent jamais faire confiance au frontend."
+
+### Q19. L'administrateur peut-il modifier les produits des vendeurs ?
+**Réponse :** "Oui, techniquement, car le rôle 'admin' bénéficie de politiques RLS d'exception (`USING (role = 'admin')`). C'est un besoin fonctionnel pour permettre la modération : si un vendeur publie un produit frauduleux ou avec un contenu inapproprié, l'administrateur a le pouvoir de supprimer le produit ou de bloquer le compte du vendeur depuis sa console d'administration, sans avoir besoin d'accès direct à la base de données."
+
+### Q20. Quel a été le plus grand défi technique rencontré lors de la création de Dugu Sugu ?
+**Réponse :** "Le plus grand défi a été l'orchestration entre le frontend React, la base de données Supabase et notre serveur Express. Assurer une communication sécurisée tout en évitant les problèmes de requêtes inter-domaines (CORS), et synchroniser un état local (comme un panier invité) vers une base de données cloud une fois l'utilisateur authentifié, a demandé une modélisation rigoureuse de nos composants et de notre logique de sécurité (JWT et RLS)."

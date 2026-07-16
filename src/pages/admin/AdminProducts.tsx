@@ -90,7 +90,7 @@ export default function AdminProducts() {
       setProducts(products.filter(p => p.id !== deleteTarget.id));
       setDeleteTarget(null);
     } catch (err: any) {
-      toast.error(err.message || 'Impossible de supprimer le produit');
+      toast.error(err?.message || (typeof err === 'string' ? err : 'Impossible de supprimer le produit'));
     } finally {
       setIsDeleting(false);
     }

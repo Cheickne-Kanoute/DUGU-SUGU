@@ -84,7 +84,7 @@ export default function AdminUsers() {
       toast.success('Rôle mis à jour');
     } else {
       const d = await res.json();
-      toast.error(d.error || 'Erreur');
+      toast.error(typeof d.error === 'string' ? d.error : (d.error?.message || 'Erreur'));
     }
   };
 
@@ -100,7 +100,7 @@ export default function AdminUsers() {
       toast.success(isBlocked ? 'Utilisateur bloqué' : 'Utilisateur débloqué');
     } else {
       const d = await res.json();
-      toast.error(d.error || 'Erreur');
+      toast.error(typeof d.error === 'string' ? d.error : (d.error?.message || 'Erreur'));
     }
   };
 
@@ -117,7 +117,7 @@ export default function AdminUsers() {
       toast.success('Utilisateur supprimé');
     } else {
       const d = await res.json();
-      toast.error(d.error || 'Erreur');
+      toast.error(typeof d.error === 'string' ? d.error : (d.error?.message || 'Erreur'));
     }
   };
 
@@ -138,7 +138,7 @@ export default function AdminUsers() {
         setForm({ full_name: '', email: '', password: '', role: 'client' });
         fetchUsers();
       } else {
-        toast.error(data.error || 'Erreur lors de la création');
+        toast.error(typeof data.error === 'string' ? data.error : (data.error?.message || 'Erreur lors de la création'));
       }
     } finally {
       setCreating(false);

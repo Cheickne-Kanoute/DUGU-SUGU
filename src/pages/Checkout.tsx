@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/hooks/useCart';
 import { createOrder } from '@/lib/api/orders';
+import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { MapPin, Phone, User, CheckCircle2 } from 'lucide-react';
+
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 export default function Checkout() {
   const { user, isAuthenticated } = useAuth();
@@ -77,17 +80,57 @@ export default function Checkout() {
           price_at_time: item.product!.price
         }));
 
-        return createOrder(orderData, orderItemsData);
+        const order = await createOrder(orderData, orderItemsData) as any;
+
+        // Fetch seller email and notify them
+        const { data: sellerProfile } = await (supabase as any)
+          .from('profiles')
+          .select('email, full_name')
+          .eq('id', sellerId)
+          .single();
+
+        if (sellerProfile?.email) {
+          fetch(`${API_BASE}/email/new-order-seller`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sellerEmail: sellerProfile.email,
+              sellerName: sellerProfile.full_name || 'Vendeur',
+              customerName: formData.fullName,
+              orderId: order.id,
+              totalAmount: sellerTotal
+            })
+          }).catch(console.error);
+        }
+
+        return order;
       });
 
-      await Promise.all(orderPromises);
+      const resolvedOrders = (await Promise.all(orderPromises)) as any[];
+      
+      // Envoi de l'email de confirmation
+      if (user?.email && resolvedOrders.length > 0) {
+        // On utilise l'ID de la première commande sous-jacente comme référence globale
+        const referenceId = resolvedOrders[0]?.id || `CMD-${Date.now()}`;
+        
+        fetch(`${API_BASE}/email/order-confirmation`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: user.email,
+            customerName: formData.fullName,
+            orderId: referenceId,
+            totalAmount: totalPrice
+          })
+        }).catch(err => console.error('Erreur lors de l\'envoi de l\'email de confirmation:', err));
+      }
 
       toast.success('Votre commande a été passée avec succès !');
       clearCart();
       navigate('/');
     } catch (error: any) {
       console.error('Erreur lors de la commande:', error);
-      toast.error(error.message || 'Une erreur est survenue lors de la commande');
+      toast.error(error?.message || (typeof error === 'string' ? error : 'Une erreur est survenue lors de la commande'));
     } finally {
       setIsLoading(false);
     }
@@ -180,7 +223,7 @@ export default function Checkout() {
                       <p className="text-xs text-[#888877]">Qté: {item.quantity}</p>
                     </div>
                     <p className="text-sm font-bold text-[#166534]">
-                      {(item.product.price * item.quantity).toLocaleString()} FCFA
+                      {(item.product.price * item.quantity).toLocaleString('fr-FR')} FCFA
                     </p>
                   </div>
                 ))}
@@ -189,7 +232,7 @@ export default function Checkout() {
               <div className="border-t border-[#e0dec8] pt-4 space-y-3 text-sm">
                 <div className="flex justify-between">
                   <span className="text-[#555544]">Sous-total</span>
-                  <span className="font-medium text-[#1a1a1a]">{totalPrice.toLocaleString()} FCFA</span>
+                  <span className="font-medium text-[#1a1a1a]">{totalPrice.toLocaleString('fr-FR')} FCFA</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#555544]">Livraison</span>
@@ -200,7 +243,7 @@ export default function Checkout() {
               <div className="border-t border-[#e0dec8] my-4 pt-4">
                 <div className="flex justify-between">
                   <span className="text-base font-semibold text-[#1a1a1a]">Total à payer</span>
-                  <span className="text-xl font-bold text-[#166534]">{totalPrice.toLocaleString()} FCFA</span>
+                  <span className="text-xl font-bold text-[#166534]">{totalPrice.toLocaleString('fr-FR')} FCFA</span>
                 </div>
               </div>
 

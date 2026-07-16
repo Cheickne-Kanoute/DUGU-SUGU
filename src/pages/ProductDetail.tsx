@@ -166,7 +166,7 @@ export default function ProductDetail() {
 
             {/* Price */}
             <div className="text-3xl lg:text-4xl font-bold text-[#166534] mt-6">
-              {product.price.toLocaleString()} FCFA
+              {product.price.toLocaleString('fr-FR')} FCFA
               <span className="text-base font-normal text-[#888877] ml-2">/ {product.unit}</span>
             </div>
 
@@ -284,7 +284,7 @@ export default function ProductDetail() {
                   />
                   <div className="p-4">
                     <h3 className="text-base font-semibold text-[#1a1a1a] line-clamp-1">{p.name}</h3>
-                    <p className="text-lg font-bold text-[#166534] mt-2">{p.price.toLocaleString()} FCFA</p>
+                    <p className="text-lg font-bold text-[#166534] mt-2">{p.price.toLocaleString('fr-FR')} FCFA</p>
                   </div>
                 </Link>
               ))}

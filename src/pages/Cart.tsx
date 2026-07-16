@@ -92,9 +92,9 @@ export default function Cart() {
                     </div>
                     <div className="text-right shrink-0">
                       <p className="text-lg font-bold text-[#166534]">
-                        {(item.product.price * item.quantity).toLocaleString()} FCFA
+                        {(item.product.price * item.quantity).toLocaleString('fr-FR')} FCFA
                       </p>
-                      <p className="text-[12px] text-[#888877]">{item.product.price.toLocaleString()} FCFA / {item.product.unit}</p>
+                      <p className="text-[12px] text-[#888877]">{item.product.price.toLocaleString('fr-FR')} FCFA / {item.product.unit}</p>
                     </div>
                     <button
                       onClick={() => { removeItem(item.id); toast.success('Article retiré'); }}
@@ -122,7 +122,7 @@ export default function Cart() {
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-[#555544]">Sous-total</span>
-                    <span className="font-medium text-[#1a1a1a]">{totalPrice.toLocaleString()} FCFA</span>
+                    <span className="font-medium text-[#1a1a1a]">{totalPrice.toLocaleString('fr-FR')} FCFA</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-[#555544]">Livraison</span>
@@ -133,7 +133,7 @@ export default function Cart() {
                 <div className="border-t border-[#e0dec8] my-4 pt-4">
                   <div className="flex justify-between">
                     <span className="text-base font-semibold text-[#1a1a1a]">Total</span>
-                    <span className="text-xl font-bold text-[#166534]">{totalPrice.toLocaleString()} FCFA</span>
+                    <span className="text-xl font-bold text-[#166534]">{totalPrice.toLocaleString('fr-FR')} FCFA</span>
                   </div>
                 </div>
 

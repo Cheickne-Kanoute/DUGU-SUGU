@@ -79,7 +79,7 @@ export default function AdminSellerRequests() {
         // to let the admin "consulter" it, but the action buttons will disappear.
         setRequests((prev) => prev.map((r) => r.id === req.id ? { ...r, status } : r));
       } else {
-        toast.error(data.error || 'Erreur');
+        toast.error(typeof data.error === 'string' ? data.error : (data.error?.message || 'Erreur'));
       }
     } finally {
       setActionLoading(null);

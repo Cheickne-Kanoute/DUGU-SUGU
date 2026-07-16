@@ -315,6 +315,10 @@ CREATE POLICY "Users can view and manage their notifications." ON public.notific
 -- Favorites
 CREATE POLICY "Users can manage their favorites." ON public.favorites FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 
+CREATE POLICY "Users can update their own requests" 
+ON public.seller_requests 
+FOR UPDATE 
+USING (auth.uid() = user_id);
 -- Seller Requests
 CREATE POLICY "Users can view their own requests" ON public.seller_requests FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert their own requests" ON public.seller_requests FOR INSERT WITH CHECK (auth.uid() = user_id);

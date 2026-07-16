@@ -59,7 +59,7 @@ export function AuthScreen({ mode }: AuthScreenProps) {
     setLoginLoading(false);
 
     if (result.error) {
-      toast.error(result.error);
+      toast.error(typeof result.error === 'string' ? result.error : (result.error?.message || JSON.stringify(result.error)));
       return;
     }
 
@@ -77,7 +77,7 @@ export function AuthScreen({ mode }: AuthScreenProps) {
     setRegisterLoading(false);
 
     if (result.error) {
-      toast.error(result.error);
+      toast.error(typeof result.error === 'string' ? result.error : (result.error?.message || JSON.stringify(result.error)));
       return;
     }
 

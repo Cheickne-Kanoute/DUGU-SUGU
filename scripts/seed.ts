@@ -34,6 +34,14 @@ const malianLastNames = [
 ];
 const malianCities = ['Bamako', 'Ségou', 'Sikasso', 'Mopti', 'Gao', 'Kayes', 'Koulikoro', 'Tombouctou'];
 
+const agriculturalProducts = [
+  'Mangues du Mali', 'Bananes douces', 'Mil', 'Sorgho', 'Riz local', 'Maïs frais', 
+  'Beurre de Karité pur', 'Oignons de Niono', 'Tomates fraîches', 'Pommes de terre de Sikasso', 
+  'Arachides décortiquées', 'Graines de Sésame', 'Noix de cajou', 'Gombo frais', 'Aubergines locales', 
+  'Ignames', 'Fonio', 'Haricots niébé', 'Citrons', 'Oranges', 'Miel naturel',
+  'Piment', 'Ail', 'Gingembre', 'Patates douces', 'Carottes', 'Choux'
+];
+
 const randomMalianName = () => {
   const firstName = faker.helpers.arrayElement(malianFirstNames);
   const lastName = faker.helpers.arrayElement(malianLastNames);
@@ -43,6 +51,13 @@ const randomMalianName = () => {
 async function seed() {
   console.log('🌱 Démarrage du script de seed (Noms Maliens)...');
   
+  // 0. Nettoyage des anciennes données
+  console.log('🧹 Suppression des anciennes commandes et produits...');
+  await supabase.from('order_items').delete().gt('quantity', 0);
+  await supabase.from('orders').delete().gt('total', -1);
+  await supabase.from('products').delete().gt('price', -1);
+  console.log('✅ Anciennes données supprimées.');
+
   // 1. Vérification et récupération des catégories
   const { data: categories, error: catError } = await supabase.from('categories').select('id');
   if (catError || !categories?.length) {
@@ -114,16 +129,17 @@ async function seed() {
   for (let i = 0; i < 60; i++) {
     const category = faker.helpers.arrayElement(categories);
     const seller_id = faker.helpers.arrayElement(sellers);
+    const productName = faker.helpers.arrayElement(agriculturalProducts);
     
     const product = {
       seller_id,
       category_id: category.id,
-      name: faker.commerce.productName(),
-      description: faker.commerce.productDescription(),
-      price: parseFloat(faker.commerce.price({ min: 500, max: 20000 })),
+      name: productName,
+      description: `Produit agricole de qualité. ${productName} fraîchement récolté(e), directement du producteur. Disponible en stock pour livraison ou retrait.`,
+      price: faker.number.int({ min: 10, max: 400 }) * 50,
       stock: faker.number.int({ min: 10, max: 500 }),
       unit: faker.helpers.arrayElement(['kg', 'sac', 'carton', 'pièce', 'botte']),
-      images: [faker.image.urlLoremFlickr({ category: 'food' })],
+      images: [faker.image.urlLoremFlickr({ category: 'vegetables,farm' })],
       is_bio: faker.datatype.boolean()
     };
     
@@ -138,7 +154,7 @@ async function seed() {
   for (let i = 0; i < 40; i++) {
     const buyer_id = faker.helpers.arrayElement(clients);
     const seller_id = faker.helpers.arrayElement(sellers);
-    const total = parseFloat(faker.commerce.price({ min: 2000, max: 50000 }));
+    const total = faker.number.int({ min: 40, max: 1000 }) * 50;
     
     const { data: orderData, error: orderError } = await supabase.from('orders').insert({
       buyer_id,
@@ -159,7 +175,7 @@ async function seed() {
           order_id: orderData.id,
           product_id,
           quantity: faker.number.int({ min: 1, max: 10 }),
-          price_at_time: parseFloat(faker.commerce.price({ min: 500, max: 10000 }))
+          price_at_time: faker.number.int({ min: 10, max: 200 }) * 50
         });
       }
     }

@@ -32,7 +32,6 @@ export const sellerNavGroups: SidebarNavGroup[] = [
         title: "Tableau de bord",
         path: "/dashboard",
         icon: <LayoutGridIcon />,
-        isActive: true,
       },
       {
         title: "Commandes",
@@ -66,7 +65,6 @@ export const clientNavGroups: SidebarNavGroup[] = [
         title: "Tableau de bord",
         path: "/dashboard",
         icon: <LayoutGridIcon />,
-        isActive: true,
       },
       {
         title: "Mon Panier",
@@ -97,7 +95,6 @@ export const adminNavGroups: SidebarNavGroup[] = [
         title: "Vue d'ensemble",
         path: "/admin/overview",
         icon: <LayoutDashboardIcon />,
-        isActive: true,
       },
     ],
   },

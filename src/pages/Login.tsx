@@ -4,12 +4,16 @@ import { AuthScreen } from '@/components/AuthScreen';
 import { useAuth } from '@/context/AuthContext';
 
 export default function Login() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const [searchParams] = useSearchParams();
 
-  if (isAuthenticated) {
-    const from = searchParams.get('from') || '/';
-    return <Navigate to={from} replace />;
+  if (isAuthenticated && user) {
+    const from = searchParams.get('from');
+    if (from) {
+      return <Navigate to={from} replace />;
+    }
+    const defaultRedirect = user.role === 'admin' ? '/admin/overview' : '/dashboard';
+    return <Navigate to={defaultRedirect} replace />;
   }
 
   return <AuthScreen mode="login" />;

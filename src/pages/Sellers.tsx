@@ -6,6 +6,7 @@ import { getSellers, type Profile } from '@/lib/api/profiles';
 export default function Sellers() {
   const [sellers, setSellers] = useState<Profile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     async function loadSellers() {
@@ -21,6 +22,11 @@ export default function Sellers() {
     loadSellers();
   }, []);
 
+  const filteredSellers = sellers.filter(seller => 
+    seller.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (seller.location && seller.location.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
   return (
     <div className="relative z-10 bg-[#f8f6f0] min-h-screen pt-[72px]">
       {/* Header */}
@@ -30,20 +36,31 @@ export default function Sellers() {
           <p className="text-sm text-muted-foreground mt-3 max-w-[600px] mx-auto">
             Découvrez les producteurs agricoles de confiance au Mali et achetez directement leurs produits frais.
           </p>
+
+          <div className="mt-8 max-w-md mx-auto relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Rechercher un producteur ou une ville..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 rounded-full border border-[#e0dec8] bg-white focus:outline-none focus:ring-2 focus:ring-[#166534] shadow-sm"
+            />
+          </div>
         </div>
       </div>
 
       <div className="max-w-[1280px] mx-auto px-6 py-10">
         {isLoading ? (
           <div className="text-center py-20 text-primary">Chargement des producteurs...</div>
-        ) : sellers.length === 0 ? (
+        ) : filteredSellers.length === 0 ? (
           <div className="text-center py-20">
             <Search className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-primary">Aucun produit trouvé</h3>
+            <h3 className="text-lg font-medium text-primary">Aucun producteur trouvé</h3>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {sellers.map(seller => (
+            {filteredSellers.map(seller => (
               <Link
                 key={seller.id}
                 to={`/seller/${seller.id}`}

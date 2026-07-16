@@ -15,6 +15,8 @@ interface SellerRequest {
   message?: string;
 }
 
+const API_BASE = import.meta.env.VITE_API_URL || '/api';
+
 export default function BecomeSellerPage() {
   const { user } = useAuth();
   const [request, setRequest] = useState<SellerRequest | null>(null);
@@ -88,6 +90,16 @@ export default function BecomeSellerPage() {
           
         if (error) throw new Error(error.message || "Erreur lors de la soumission");
 
+        // Notification Email
+        fetch(`${API_BASE}/email/seller-request-submitted`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: user.email,
+            customerName: user.full_name || 'Client',
+          }),
+        }).catch(console.error);
+
         setRequest({ ...request, status: "pending", message });
         toast.success("Votre demande a été soumise à nouveau.");
       } else {
@@ -102,6 +114,17 @@ export default function BecomeSellerPage() {
           .single();
 
         if (error) throw error;
+        
+        // Notification Email
+        fetch(`${API_BASE}/email/seller-request-submitted`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: user.email,
+            customerName: user.full_name || 'Client',
+          }),
+        }).catch(console.error);
+
         setRequest(data);
         toast.success("Votre demande a été soumise avec succès.");
       }

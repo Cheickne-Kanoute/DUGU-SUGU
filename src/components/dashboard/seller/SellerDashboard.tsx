@@ -17,7 +17,7 @@ export default function SellerDashboard() {
     return (
       <div className="p-4 bg-destructive/10 text-destructive rounded-lg border border-destructive/20">
         <p className="font-semibold">Erreur lors du chargement de vos données</p>
-        <p className="text-sm mt-1">{error}</p>
+        <p className="text-sm mt-1">{typeof error === 'string' ? error : (error?.message || JSON.stringify(error))}</p>
       </div>
     );
   }

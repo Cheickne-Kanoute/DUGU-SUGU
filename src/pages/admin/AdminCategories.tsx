@@ -99,7 +99,7 @@ export default function AdminCategories() {
         setModalOpen(false);
         fetchCategories();
       } else {
-        toast.error(data.error || 'Erreur');
+        toast.error(typeof data.error === 'string' ? data.error : (data.error?.message || 'Erreur'));
       }
     } finally {
       setSaving(false);
@@ -121,7 +121,7 @@ export default function AdminCategories() {
         setDeleteTarget(null);
         fetchCategories();
       } else {
-        toast.error(data.error || 'Erreur');
+        toast.error(typeof data.error === 'string' ? data.error : (data.error?.message || 'Erreur'));
       }
     } finally {
       setDeleting(false);

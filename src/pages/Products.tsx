@@ -231,7 +231,7 @@ export default function Products() {
                       </Link>
                       
                       <div className="flex items-center justify-between mt-2.5 mb-2">
-                        <span className="text-base sm:text-lg font-bold text-[#166534]">{product.price.toLocaleString()} FCFA</span>
+                        <span className="text-base sm:text-lg font-bold text-[#166534]">{product.price.toLocaleString('fr-FR')} FCFA</span>
                       </div>
 
                       <div className="flex items-center gap-1.5 mb-3">
