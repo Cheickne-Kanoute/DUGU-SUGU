@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate } from 'react-router-dom';
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { toast } from 'sonner';
@@ -7,7 +7,11 @@ import { useAuth } from '@/context/AuthContext';
 export default function Cart() {
   const { items, totalItems, totalPrice, updateQuantity, removeItem, clearCart } = useCart();
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+
+  if (user && user.role !== 'client') {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   const handleCheckout = () => {
     if (items.length === 0) {

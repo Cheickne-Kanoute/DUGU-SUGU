@@ -210,14 +210,16 @@ export default function Products() {
                       alt={product.name}
                       className="w-full h-40 sm:h-48 object-cover transition-transform hover:scale-105 duration-500"
                     />
-                    <button
-                      onClick={(e) => handleToggleFavorite(e, product.id)}
-                      className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur-sm hover:bg-white rounded-full text-gray-600 transition-colors shadow-sm z-10"
-                    >
-                      <Heart 
-                        className={`w-5 h-5 transition-colors ${isFavorite(product.id) ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} 
-                      />
-                    </button>
+                    {(!user || user.role === 'client') && (
+                      <button
+                        onClick={(e) => handleToggleFavorite(e, product.id)}
+                        className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur-sm hover:bg-white rounded-full text-gray-600 transition-colors shadow-sm z-10"
+                      >
+                        <Heart 
+                          className={`w-5 h-5 transition-colors ${isFavorite(product.id) ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} 
+                        />
+                      </button>
+                    )}
                   </Link>
                   <div className="p-3.5 flex flex-col flex-1">
                     <div className="mb-auto">
@@ -246,42 +248,44 @@ export default function Products() {
                       </div>
                     </div>
                     
-                    <div className="mt-2">
-                      {cartItem ? (
-                        <div className="flex items-center justify-between rounded-full border border-[#e0dec8] bg-[#f8f6f0] px-3 py-2">
-                          <span className="text-xs font-medium text-[#555544]">Au panier</span>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon-xs"
-                              className="w-7 h-7 rounded-full border-[#e0dec8] bg-white"
-                              onClick={() => handleDecreaseQuantity(product.id)}
-                            >
-                              <Minus className="w-3 h-3 text-[#1a1a1a]" />
-                            </Button>
-                            <span className="min-w-6 text-center text-sm font-semibold">{cartItem.quantity}</span>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon-xs"
-                              className="w-7 h-7 rounded-full border-[#e0dec8] bg-white text-[#166534]"
-                              onClick={() => handleIncreaseQuantity(product.id)}
-                            >
-                              <Plus className="w-3 h-3" />
-                            </Button>
+                    {(!user || user.role === 'client') && (
+                      <div className="mt-2">
+                        {cartItem ? (
+                          <div className="flex items-center justify-between rounded-full border border-[#e0dec8] bg-[#f8f6f0] px-3 py-2">
+                            <span className="text-xs font-medium text-[#555544]">Au panier</span>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon-xs"
+                                className="w-7 h-7 rounded-full border-[#e0dec8] bg-white"
+                                onClick={() => handleDecreaseQuantity(product.id)}
+                              >
+                                <Minus className="w-3 h-3 text-[#1a1a1a]" />
+                              </Button>
+                              <span className="min-w-6 text-center text-sm font-semibold">{cartItem.quantity}</span>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon-xs"
+                                className="w-7 h-7 rounded-full border-[#e0dec8] bg-white text-[#166534]"
+                                onClick={() => handleIncreaseQuantity(product.id)}
+                              >
+                                <Plus className="w-3 h-3" />
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => handleAddToCart(product.id)}
-                          className="flex w-full items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-[#166534] text-white text-sm font-semibold hover:bg-[#14532d] transition-colors"
-                        >
-                          <ShoppingCart className="w-4 h-4" />
-                          Ajouter au panier
-                        </button>
-                      )}
-                    </div>
+                        ) : (
+                          <button
+                            onClick={() => handleAddToCart(product.id)}
+                            className="flex w-full items-center justify-center gap-2 px-4 py-2.5 rounded-full bg-[#166534] text-white text-sm font-semibold hover:bg-[#14532d] transition-colors"
+                          >
+                            <ShoppingCart className="w-4 h-4" />
+                            Ajouter au panier
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );

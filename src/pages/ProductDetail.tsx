@@ -139,14 +139,16 @@ export default function ProductDetail() {
 
             <div className="flex justify-between items-start mt-4">
               <h1 className="text-2xl lg:text-[32px] font-bold text-[#1a1a1a] pr-4">{product.name}</h1>
-              <button
-                onClick={handleToggleFavorite}
-                className="shrink-0 p-3 bg-white border border-[#e0dec8] hover:bg-[#f8f6f0] rounded-full text-gray-600 transition-colors shadow-sm"
-              >
-                <Heart 
-                  className={`w-6 h-6 transition-colors ${isFavorite(product.id) ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} 
-                />
-              </button>
+              {(!user || user.role === 'client') && (
+                <button
+                  onClick={handleToggleFavorite}
+                  className="shrink-0 p-3 bg-white border border-[#e0dec8] hover:bg-[#f8f6f0] rounded-full text-gray-600 transition-colors shadow-sm"
+                >
+                  <Heart 
+                    className={`w-6 h-6 transition-colors ${isFavorite(product.id) ? 'fill-red-500 text-red-500' : 'text-gray-600'}`} 
+                  />
+                </button>
+              )}
             </div>
 
             {/* Seller */}
@@ -173,71 +175,74 @@ export default function ProductDetail() {
               {product.description}
             </p>
 
-            {/* Quantity */}
-            <div className="mt-6">
-              <label className="text-sm font-medium text-[#1a1a1a] mb-2 block">Quantité</label>
-              {cartItem ? (
-                <div className="mb-3 flex items-center justify-between rounded-xl border border-[#e0dec8] bg-white px-4 py-3">
-                  <span className="text-sm text-[#555544]">Déjà dans le panier</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => updateQuantity(cartItem.id, cartItem.quantity - 1)}
-                      className="w-9 h-9 flex items-center justify-center rounded-lg border border-[#e0dec8] text-[#1a1a1a] hover:bg-[#f8f6f0] transition-colors"
-                    >
-                      <Minus className="w-4 h-4" />
-                    </button>
-                    <span className="min-w-10 text-center text-sm font-medium">{cartItem.quantity}</span>
-                    <button
-                      onClick={() => updateQuantity(cartItem.id, cartItem.quantity + 1)}
-                      className="w-9 h-9 flex items-center justify-center rounded-lg border border-[#e0dec8] text-[#1a1a1a] hover:bg-[#f8f6f0] transition-colors"
-                    >
-                      <Plus className="w-4 h-4" />
-                    </button>
-                  </div>
+            {/* Quantity and Actions (Clients only) */}
+            {(!user || user.role === 'client') && (
+              <>
+                <div className="mt-6">
+                  <label className="text-sm font-medium text-[#1a1a1a] mb-2 block">Quantité</label>
+                  {cartItem ? (
+                    <div className="mb-3 flex items-center justify-between rounded-xl border border-[#e0dec8] bg-white px-4 py-3">
+                      <span className="text-sm text-[#555544]">Déjà dans le panier</span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => updateQuantity(cartItem.id, cartItem.quantity - 1)}
+                          className="w-9 h-9 flex items-center justify-center rounded-lg border border-[#e0dec8] text-[#1a1a1a] hover:bg-[#f8f6f0] transition-colors"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                        <span className="min-w-10 text-center text-sm font-medium">{cartItem.quantity}</span>
+                        <button
+                          onClick={() => updateQuantity(cartItem.id, cartItem.quantity + 1)}
+                          className="w-9 h-9 flex items-center justify-center rounded-lg border border-[#e0dec8] text-[#1a1a1a] hover:bg-[#f8f6f0] transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="inline-flex items-center border border-[#e0dec8] rounded-lg overflow-hidden">
+                      <button
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        className="w-10 h-10 flex items-center justify-center text-[#1a1a1a] hover:bg-[#f8f6f0] transition-colors"
+                      >
+                        <Minus className="w-4 h-4" />
+                      </button>
+                      <input
+                        type="number"
+                        value={quantity}
+                        onChange={e => setQuantity(Math.max(1, Number(e.target.value)))}
+                        className="w-14 h-10 text-center text-sm border-x border-[#e0dec8] outline-none"
+                        min={1}
+                      />
+                      <button
+                        onClick={() => setQuantity(quantity + 1)}
+                        className="w-10 h-10 flex items-center justify-center text-[#1a1a1a] hover:bg-[#f8f6f0] transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="inline-flex items-center border border-[#e0dec8] rounded-lg overflow-hidden">
-                  <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="w-10 h-10 flex items-center justify-center text-[#1a1a1a] hover:bg-[#f8f6f0] transition-colors"
-                  >
-                    <Minus className="w-4 h-4" />
-                  </button>
-                  <input
-                    type="number"
-                    value={quantity}
-                    onChange={e => setQuantity(Math.max(1, Number(e.target.value)))}
-                    className="w-14 h-10 text-center text-sm border-x border-[#e0dec8] outline-none"
-                    min={1}
-                  />
-                  <button
-                    onClick={() => setQuantity(quantity + 1)}
-                    className="w-10 h-10 flex items-center justify-center text-[#1a1a1a] hover:bg-[#f8f6f0] transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-            </div>
 
-            {/* Actions */}
-            <div className="flex flex-col gap-3 mt-6">
-              {!cartItem ? (
-                <button
-                  onClick={handleAddToCart}
-                  className="w-full h-[52px] rounded-full bg-[#166534] text-white font-semibold flex items-center justify-center gap-2 hover:bg-[#14532d] transition-colors"
-                >
-                  <ShoppingCart className="w-5 h-5" />
-                  Ajouter au Panier
-                </button>
-              ) : null}
-              <button
-                onClick={handleOrder}
-                className="w-full h-[52px] rounded-full border-2 border-[#166534] bg-white text-[#166534] font-semibold flex items-center justify-center gap-2 hover:bg-[#f8f6f0] transition-colors"
-              >
-                Commander Maintenant
-              </button>
-            </div>
+                <div className="flex flex-col gap-3 mt-6">
+                  {!cartItem ? (
+                    <button
+                      onClick={handleAddToCart}
+                      className="w-full h-[52px] rounded-full bg-[#166534] text-white font-semibold flex items-center justify-center gap-2 hover:bg-[#14532d] transition-colors"
+                    >
+                      <ShoppingCart className="w-5 h-5" />
+                      Ajouter au Panier
+                    </button>
+                  ) : null}
+                  <button
+                    onClick={handleOrder}
+                    className="w-full h-[52px] rounded-full border-2 border-[#166534] bg-white text-[#166534] font-semibold flex items-center justify-center gap-2 hover:bg-[#f8f6f0] transition-colors"
+                  >
+                    Commander Maintenant
+                  </button>
+                </div>
+              </>
+            )}
 
             {/* Product Details Table */}
             <div className="mt-8 bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] overflow-hidden">

@@ -21,10 +21,11 @@ L'application **Dugu Sugu** a pour but de fournir :
 ## 2. Analyse des Besoins et Cahier des Charges
 
 ### 2.1. Besoins Fonctionnels
-L'application est divisée en plusieurs "Rôles" (Use Cases) :
-- **L'Acheteur (Client)** : Peut parcourir les catégories, rechercher un produit, l'ajouter au panier, passer une commande et suivre son historique d'achats.
-- **Le Vendeur** : Dispose d'un espace privé (Dashboard) pour ajouter des produits (avec images, prix, descriptions), gérer son stock, créer des catégories personnalisées, et visualiser ses statistiques de ventes via des graphiques.
-- **L'Administrateur** : Supervise l'ensemble de la plateforme, gère les utilisateurs (bannissement, vérification) et accède à des statistiques globales.
+L'application est divisée en plusieurs "Rôles" (Use Cases) avec des accès stricts :
+- **Le Visiteur (Non connecté)** : Peut parcourir le catalogue et ajouter des produits dans un panier temporaire local.
+- **L'Acheteur (Client)** : Seul rôle autorisé à passer des commandes, ajouter aux favoris et accéder au checkout. Son panier local est automatiquement synchronisé à la connexion.
+- **Le Vendeur** : Dispose d'un espace privé (Dashboard) pour ajouter des produits, gérer son stock et visualiser ses statistiques. Il ne peut pas effectuer d'achats (boutons de panier et favoris masqués).
+- **L'Administrateur** : Supervise l'ensemble de la plateforme et gère les utilisateurs. Comme le vendeur, il n'a pas accès aux actions d'achat.
 
 ### 2.2. Besoins Non-Fonctionnels
 - **Performance** : Le temps de chargement doit être minimal (utilisation d'une architecture SPA).
@@ -142,6 +143,10 @@ Stocker des images en Base64 dans la BDD ruinerait les performances. Le cycle de
 3. Supabase renvoie une URL publique CDN.
 4. Cette URL textuelle est sauvegardée dans la colonne `image_url` de la table `products`.
 
+### 5.3. Contrôle d'Accès Basé sur les Rôles (RBAC) et Expérience Client
+Une stricte séparation des rôles a été implémentée sur le Frontend. Les vendeurs et administrateurs n'ont pas accès aux workflows d'achat (panier, favoris, commandes) pour éviter les conflits logiques.
+Pour optimiser l'expérience utilisateur, un visiteur non connecté peut commencer ses achats : les produits sont sauvegardés dans le `localStorage` du navigateur. Lors de son inscription ou de sa connexion en tant que client, une fonction `syncCartToDb` est déclenchée pour fusionner instantanément son panier temporaire avec sa session sécurisée en base de données, sans aucune perte de données.
+
 ---
 
 ## 6. L'Architecture Backend (Express.js)
@@ -203,3 +208,6 @@ La conception de **Dugu Sugu** a permis de mettre en pratique des concepts avanc
 
 ### Q8. Si vous deviez refaire ce projet, que feriez-vous différemment pour passer à grande échelle ?
 **Réponse :** "Dugu Sugu est actuellement une Single Page Application (SPA). Bien que la réactivité soit excellente pour le Dashboard Vendeur, le catalogue public souffre en termes de SEO car le HTML est généré côté client. La prochaine évolution architecturale serait de migrer le frontend public vers **Next.js** pour bénéficier du Server-Side Rendering (SSR). Cela permettrait aux robots de Google d'indexer parfaitement nos produits. Nous devrions aussi implémenter un cache Redis sur Express pour réduire la charge de la base de données."
+
+### Q9. Comment gérez-vous le panier pour un visiteur qui n'a pas encore créé de compte ?
+**Réponse :** "Pour ne pas frustrer l'utilisateur et encourager la conversion, le visiteur peut ajouter des articles au panier sans être connecté. Ces données sont stockées dans le navigateur via le `localStorage`. Cependant, la page de validation (`/checkout`) est bloquée par la vérification de l'authentification. Dès que le visiteur se connecte ou s'inscrit, le contexte d'authentification (`AuthContext`) détecte son rôle 'client' et exécute une fonction asynchrone `syncCartToDb` qui transfère automatiquement tous les articles locaux vers la base de données Supabase. Le panier local est ensuite purgé."

@@ -49,16 +49,18 @@ export function MobileNav() {
 									<a href={link.href}>{link.label}</a>
 								</Button>
 							))}
-							<Button
-								className="justify-start rounded-full px-4 text-muted-foreground hover:bg-primary/5 hover:text-primary"
-								variant="ghost"
-								asChild
-							>
-								<a href="/cart" aria-label="Panier">
-									<ShoppingCartIcon className="mr-2 size-4" />
-									Panier
-								</a>
-							</Button>
+							{(!user || user.role === 'client') && (
+								<Button
+									className="justify-start rounded-full px-4 text-muted-foreground hover:bg-primary/5 hover:text-primary"
+									variant="ghost"
+									asChild
+								>
+									<a href="/cart" aria-label="Panier">
+										<ShoppingCartIcon className="mr-2 size-4" />
+										Panier
+									</a>
+								</Button>
+							)}
 						</div>
 						<div className="mt-12 flex flex-col gap-2">
 							{isAuthenticated ? (

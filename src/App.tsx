@@ -44,18 +44,11 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/products" element={<Products />} />
           <Route path="/product/:id" element={<ProductDetail />} />
-          <Route
-            path="/cart"
-            element={
-              <ProtectedRoute>
-                <Cart />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/cart" element={<Cart />} />
           <Route
             path="/checkout"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requiredRole="client">
                 <Checkout />
               </ProtectedRoute>
             }

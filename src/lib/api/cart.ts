@@ -25,10 +25,27 @@ function saveLocalCart(cart: any[]) {
 
 export async function getCart(userId?: string): Promise<CartItem[]> {
   if (!userId) {
-    return getLocalCart();
+    const localCart = getLocalCart();
+    if (localCart.length === 0) return [];
+    
+    const productIds = localCart.map(item => item.product_id);
+    const { data: products, error } = await (supabase as any)
+      .from('products')
+      .select('*, seller:seller_id(full_name, avatar_url)')
+      .in('id', productIds);
+      
+    if (error) {
+      console.error('Failed to load local cart products', error);
+      return localCart;
+    }
+    
+    return localCart.map(item => ({
+      ...item,
+      product: products.find((p: any) => p.id === item.product_id)
+    }));
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from('cart_items')
     .select(`
       *,
@@ -58,7 +75,7 @@ export async function addToCart(productId: string, quantity: number, userId?: st
   }
 
   // Check if exists in DB
-  const { data: existing } = await supabase
+  const { data: existing } = await (supabase as any)
     .from('cart_items')
     .select('*')
     .eq('user_id', userId)
@@ -66,7 +83,7 @@ export async function addToCart(productId: string, quantity: number, userId?: st
     .maybeSingle();
 
   if (existing) {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('cart_items')
       .update({ quantity: existing.quantity + quantity })
       .eq('id', existing.id)
@@ -75,7 +92,7 @@ export async function addToCart(productId: string, quantity: number, userId?: st
     if (error) throw error;
     return data;
   } else {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('cart_items')
       .insert([{ user_id: userId, product_id: productId, quantity }])
       .select()
@@ -103,7 +120,7 @@ export async function updateCartItem(itemId: string, quantity: number, userId?: 
     if (error) throw error;
     return null;
   } else {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from('cart_items')
       .update({ quantity })
       .eq('id', itemId)

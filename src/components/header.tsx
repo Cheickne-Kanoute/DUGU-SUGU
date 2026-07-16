@@ -66,16 +66,18 @@ export function Header() {
 						))}
 					</div>
 					<div className="flex items-center gap-2 pl-2">
-						<Button
-							size="icon-sm"
-							variant="outline"
-							className="h-9 w-9 rounded-full border-primary/20 bg-background text-primary shadow-sm transition-colors hover:bg-primary/5"
-							asChild
-						>
-							<a href="/cart" aria-label="Panier">
-								<ShoppingCartIcon className="size-4" />
-							</a>
-						</Button>
+						{(!user || user.role === 'client') && (
+							<Button
+								size="icon-sm"
+								variant="outline"
+								className="h-9 w-9 rounded-full border-primary/20 bg-background text-primary shadow-sm transition-colors hover:bg-primary/5"
+								asChild
+							>
+								<a href="/cart" aria-label="Panier">
+									<ShoppingCartIcon className="size-4" />
+								</a>
+							</Button>
+						)}
 						{isAuthenticated ? (
 							<>
 								<Button

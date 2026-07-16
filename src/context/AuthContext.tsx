@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { getProfileById } from '@/lib/api/profiles';
+import { syncCartToDb } from '@/lib/api/cart';
 
 import type { Database } from '../types/database';
 
@@ -139,6 +140,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await signOutBlockedUser();
           return { error: 'Votre compte est bloqué. Contactez un administrateur.' };
         }
+        
+        if (profile?.role === 'client') {
+          await syncCartToDb(data.user.id);
+          window.dispatchEvent(new CustomEvent('cart-updated'));
+        }
       }
       return {};
     } catch (err: any) {
@@ -167,6 +173,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (authData.user) {
         // Profile will be created by database trigger
         await fetchProfile(authData.user.id, authData.session?.access_token);
+        await syncCartToDb(authData.user.id);
+        window.dispatchEvent(new CustomEvent('cart-updated'));
       }
       return {};
     } catch (err: any) {
