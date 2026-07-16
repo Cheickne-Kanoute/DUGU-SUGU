@@ -48,7 +48,7 @@ export function HeroSection() {
 					)}
 				>
 					Achetez et vendez vos{" "}
-					<span className="italic font-cursive">produits</span>{" "}
+					<span className="font-['Caveat',_cursive] text-[#166534] text-[1.3em] font-bold px-1 -rotate-2 inline-block leading-none">produits</span>{" "}
 					agricoles en toute simplicité
 				</h1>
 

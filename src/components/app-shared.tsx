@@ -49,6 +49,11 @@ export const sellerNavGroups: SidebarNavGroup[] = [
         path: "/dashboard/products",
         icon: <PackageIcon />,
       },
+      {
+        title: "Gestion du stock",
+        path: "/dashboard/stock",
+        icon: <ClipboardListIcon />,
+      },
     ],
   },
 ];

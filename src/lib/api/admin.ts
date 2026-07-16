@@ -21,7 +21,7 @@ export async function createSellerRequest(message: string) {
     .insert({
       user_id: user.id,
       message
-    })
+    } as any)
     .select()
     .single();
 
@@ -50,15 +50,14 @@ export async function approveSellerRequest(requestId: string, userId: string) {
   const { error: rpcError } = await supabase.rpc('promote_to_seller', {
     user_to_promote: userId,
     request_id: requestId
-  });
+  } as any);
 
   if (rpcError) throw rpcError;
   return true;
 }
 
 export async function rejectSellerRequest(requestId: string) {
-  const { data, error } = await supabase
-    .from('seller_requests')
+  const { data, error } = await (supabase.from('seller_requests') as any)
     .update({ status: 'rejected' })
     .eq('id', requestId)
     .select()

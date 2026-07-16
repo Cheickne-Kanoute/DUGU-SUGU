@@ -307,16 +307,16 @@ export interface Database {
       }
     }
     Views: {
-      [_ in never]: never
+      [key: string]: any
     }
     Functions: {
-      [_ in never]: never
+      [key: string]: any
     }
     Enums: {
-      [_ in never]: never
+      [key: string]: any
     }
     CompositeTypes: {
-      [_ in never]: never
+      [key: string]: any
     }
   }
 }

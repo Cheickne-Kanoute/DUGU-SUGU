@@ -54,23 +54,50 @@ export async function createOrder(
   items: Omit<Database['public']['Tables']['order_items']['Insert'], 'id' | 'order_id'>[]
 ) {
   // 1. Create order
-  const { data: newOrder, error: orderError } = await supabase.from('orders').insert([order]).select().single();
+  const { data: newOrder, error: orderError } = await supabase.from('orders').insert([order] as any).select().single();
   if (orderError) throw orderError;
 
   // 2. Create order items
   const orderItemsToInsert = items.map(item => ({
     ...item,
-    order_id: newOrder.id,
+    order_id: (newOrder as any).id,
   }));
 
-  const { error: itemsError } = await supabase.from('order_items').insert(orderItemsToInsert);
+  const { error: itemsError } = await supabase.from('order_items').insert(orderItemsToInsert as any);
   if (itemsError) throw itemsError;
+
+  // 3. Deduct stock and check low stock threshold
+  for (const item of items) {
+    if (!item.product_id) continue;
+    
+    const { data: product } = await supabase
+      .from('products')
+      .select('stock, low_stock_threshold, seller_id, name')
+      .eq('id', item.product_id)
+      .single();
+
+    if (product) {
+      const p = product as any;
+      const newStock = Math.max(0, (p.stock || 0) - item.quantity);
+      await (supabase.from('products') as any).update({ stock: newStock }).eq('id', item.product_id);
+
+      // Create notification if stock becomes low
+      if ((p.stock || 0) > (p.low_stock_threshold || 0) && newStock <= (p.low_stock_threshold || 0)) {
+        await supabase.from('notifications').insert({
+          user_id: p.seller_id,
+          title: 'Stock faible',
+          message: `Le stock pour le produit "${p.name}" est maintenant très faible (${newStock} restant). Veuillez réapprovisionner.`,
+          type: 'low_stock'
+        } as any);
+      }
+    }
+  }
 
   return newOrder;
 }
 
 export async function updateOrderStatus(id: string, status: Database['public']['Tables']['orders']['Update']['status']) {
-  const { data, error } = await supabase.from('orders').update({ status }).eq('id', id).select().single();
+  const { data, error } = await (supabase.from('orders') as any).update({ status }).eq('id', id).select().single();
   if (error) throw error;
   return data;
 }

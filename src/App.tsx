@@ -16,6 +16,7 @@ import ProfilePage from '@/pages/Profile';
 import DashboardLayout from '@/pages/dashboard/DashboardLayout';
 import SellerOrdersPage from '@/pages/dashboard/seller/SellerOrdersPage';
 import SellerProductsPage from '@/pages/dashboard/seller/SellerProductsPage';
+import SellerStockPage from '@/pages/dashboard/seller/SellerStockPage';
 import BecomeSellerPage from '@/pages/dashboard/client/BecomeSellerPage';
 import ClientOrdersPage from '@/pages/dashboard/client/ClientOrdersPage';
 import ClientFavoritesPage from '@/pages/dashboard/client/ClientFavoritesPage';
@@ -90,6 +91,14 @@ export default function App() {
               element={
                 <ProtectedRoute requiredRole="seller">
                   <SellerProductsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="stock"
+              element={
+                <ProtectedRoute requiredRole="seller">
+                  <SellerStockPage />
                 </ProtectedRoute>
               }
             />
