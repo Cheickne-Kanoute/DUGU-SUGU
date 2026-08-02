@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Users — lecture publique, écriture propriétaire ou admin
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if request.auth.uid == userId || isAdmin();
+    }
+
+    // Catégories — lecture publique, écriture admin
+    match /categories/{catId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Produits — lecture publique, CRUD vendeur propriétaire ou admin
+    match /produits/{produitId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && isSeller();
+      allow update, delete: if isAuthenticated() &&
+        (resource.data.vendeurId == request.auth.uid || isAdmin());
+    }
+
+    // Commandes — lecture buyer/seller, création buyer, update seller
+    match /commandes/{commandeId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.acheteurId == request.auth.uid ||
+         resource.data.vendeurId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() &&
+        (resource.data.vendeurId == request.auth.uid ||
+         resource.data.acheteurId == request.auth.uid || isAdmin());
+    }
+
+    // Paiements
+    match /paiements/{paiementId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+    }
+
+    // Livraisons
+    match /livraisons/{livraisonId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+    }
+
+    // Panier — propriétaire seulement
+    match /panierItems/{itemId} {
+      allow read, write: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+    }
+
+    // Avis — lecture publique, création acheteur
+    match /avis/{avisId} {
+      allow read: if true;
+      allow create: if isAuthenticated();
+    }
+
+    // Notifications — propriétaire seulement
+    match /notifications/{notifId} {
+      allow read, write: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+    }
+
+    // Favoris — propriétaire seulement
+    match /favoris/{favoriId} {
+      allow read, write: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+    }
+
+    // Demandes vendeur
+    match /demandesVendeur/{reqId} {
+      allow read, write: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+    }
+
+    // Helpers
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    function isAdmin() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    function isSeller() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'seller';
+    }
+  }
+}

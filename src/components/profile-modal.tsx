@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/lib/supabase";
+import { updateProfile } from "@/lib/api/profiles";
 import {
   Dialog,
   DialogContent,
@@ -28,46 +28,57 @@ export function ProfileModal({ open, onOpenChange }: ProfileModalProps) {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const [form, setForm] = useState({
-    full_name: user?.full_name ?? "",
-    phone: user?.phone ?? "",
-    bio: user?.bio ?? "",
-    location: user?.location ?? "",
+    nom: user?.nom || "",
+    prenom: user?.prenom || "",
+    phone: user?.phone || "",
+    bio: user?.bio || "",
+    location: user?.location || "",
   });
 
-  // Reset form when user changes or modal opens
+  useEffect(() => {
+    if (user) {
+      const parts = (user.full_name || "").split(" ");
+      setForm({
+        nom: user.nom || parts.slice(1).join(" ") || "",
+        prenom: user.prenom || parts[0] || "",
+        phone: user.phone || "",
+        bio: user.bio || "",
+        location: user.location || user.address || "",
+      });
+    }
+  }, [user, open]);
+
   const handleOpenChange = (val: boolean) => {
     if (val && user) {
+      const parts = (user.full_name || "").split(" ");
       setForm({
-        full_name: user.full_name ?? "",
-        phone: user.phone ?? "",
-        bio: user.bio ?? "",
-        location: user.location ?? "",
+        nom: user.nom || parts.slice(1).join(" ") || "",
+        prenom: user.prenom || parts[0] || "",
+        phone: user.phone || "",
+        bio: user.bio || "",
+        location: user.location || user.address || "",
       });
       setMessage(null);
     }
     onOpenChange(val);
   };
 
+  const getInitials = (name: string) =>
+    name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+
   const getRoleLabel = (role?: string) => {
     switch (role) {
       case "admin": return "Administrateur";
-      case "seller": return "Vendeur";
-      case "client": return "Client";
+      case "seller": return "Vendeur (Producteur)";
+      case "client": return "Client (Consommateur)";
       default: return "Visiteur";
     }
   };
-
-  const getRoleVariant = (role?: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (role) {
-      case "admin": return "destructive";
-      case "seller": return "default";
-      case "client": return "secondary";
-      default: return "outline";
-    }
-  };
-
-  const getInitials = (name: string) =>
-    name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,140 +87,158 @@ export function ProfileModal({ open, onOpenChange }: ProfileModalProps) {
     setMessage(null);
 
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          full_name: form.full_name,
-          phone: form.phone || null,
-          bio: form.bio || null,
-          location: form.location || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", user.id);
-
-      if (error) throw error;
+      await updateProfile(user.id, {
+        nom: form.nom,
+        prenom: form.prenom,
+        full_name: `${form.prenom} ${form.nom}`.trim(),
+        phone: form.phone || null,
+        bio: form.bio || null,
+        location: form.location || null,
+        address: form.location || null,
+      });
 
       await refreshUser();
-      setMessage({ type: "success", text: "Profil mis à jour avec succès !" });
+      setMessage({ type: "success", text: "Profil mis à jour !" });
+      setTimeout(() => onOpenChange(false), 1200);
     } catch (err: any) {
-      setMessage({ type: "error", text: err.message || "Une erreur est survenue." });
+      setMessage({ type: "error", text: err.message || "Erreur de mise à jour" });
     } finally {
       setIsSaving(false);
     }
   };
 
-  if (!user) return null;
-
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="sm:max-w-125">
         <DialogHeader>
-          <DialogTitle className="text-xl font-semibold">Mon Profil</DialogTitle>
+          <DialogTitle>Mon Profil</DialogTitle>
           <DialogDescription>
-            Gérez vos informations personnelles et votre compte.
+            Consultez et modifiez vos informations personnelles (Nom et Prénom PFE).
           </DialogDescription>
         </DialogHeader>
 
-        {/* Avatar + Identity section */}
+        {/* Identity Header */}
         <div className="flex items-center gap-4 py-2">
-          <div className="relative">
-            <Avatar className="size-16 ring-2 ring-primary/20">
-              <AvatarImage src={user.avatar_url ?? undefined} />
-              <AvatarFallback className="text-lg bg-primary/10 text-primary font-semibold">
-                {getInitials(user.full_name)}
-              </AvatarFallback>
-            </Avatar>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-base truncate">{user.full_name}</p>
-            <p className="text-sm text-muted-foreground truncate">{user.email}</p>
-            <Badge variant={getRoleVariant(user.role)} className="mt-1 text-xs">
-              {getRoleLabel(user.role)}
-            </Badge>
+          <Avatar className="h-16 w-16">
+            <AvatarImage src={user?.avatar_url ?? undefined} />
+            <AvatarFallback className="bg-primary/10 text-primary text-lg font-bold">
+              {getInitials(user?.full_name || `${form.prenom} ${form.nom}` || "DU")}
+            </AvatarFallback>
+          </Avatar>
+          <div className="space-y-1 min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-base truncate">{user?.full_name || `${form.prenom} ${form.nom}`}</h3>
+              <Badge variant="secondary" className="shrink-0 text-[10px]">
+                {getRoleLabel(user?.role)}
+              </Badge>
+            </div>
+            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
           </div>
         </div>
 
         <Separator />
 
-        {/* Edit form */}
-        <form onSubmit={handleSubmit} className="space-y-4 pt-1">
-          <div className="space-y-1.5">
-            <Label htmlFor="profile-full-name" className="flex items-center gap-1.5 text-sm font-medium">
-              <UserIcon className="size-3.5 text-muted-foreground" />
-              Nom complet
-            </Label>
-            <Input
-              id="profile-full-name"
-              value={form.full_name}
-              onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-              placeholder="Votre nom complet"
-              required
-            />
+        {message && (
+          <div className={`p-3 rounded-md text-xs ${message.type === "success" ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-destructive/10 text-destructive border border-destructive/20"}`}>
+            {message.text}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-3.5 py-1">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="modal-nom" className="text-xs flex items-center gap-1.5">
+                <UserIcon className="size-3.5 text-muted-foreground" />
+                Nom
+              </Label>
+              <Input
+                id="modal-nom"
+                value={form.nom}
+                onChange={(e) => setForm({ ...form, nom: e.target.value })}
+                placeholder="Coulibaly"
+                className="h-9 text-sm"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="modal-prenom" className="text-xs flex items-center gap-1.5">
+                <UserIcon className="size-3.5 text-muted-foreground" />
+                Prénom
+              </Label>
+              <Input
+                id="modal-prenom"
+                value={form.prenom}
+                onChange={(e) => setForm({ ...form, prenom: e.target.value })}
+                placeholder="Amadou"
+                className="h-9 text-sm"
+              />
+            </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="profile-phone" className="flex items-center gap-1.5 text-sm font-medium">
+            <Label htmlFor="modal-phone" className="text-xs flex items-center gap-1.5">
               <PhoneIcon className="size-3.5 text-muted-foreground" />
               Téléphone
             </Label>
             <Input
-              id="profile-phone"
-              type="tel"
+              id="modal-phone"
               value={form.phone}
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
               placeholder="+223 00 00 00 00"
+              className="h-9 text-sm"
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="profile-location" className="flex items-center gap-1.5 text-sm font-medium">
+            <Label htmlFor="modal-location" className="text-xs flex items-center gap-1.5">
               <MapPinIcon className="size-3.5 text-muted-foreground" />
-              Localisation (ville, pays)
+              Localisation
             </Label>
             <Input
-              id="profile-location"
+              id="modal-location"
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
-              placeholder="Ex: Bamako, Mali"
+              placeholder="Bamako, Mali"
+              className="h-9 text-sm"
             />
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="profile-bio" className="flex items-center gap-1.5 text-sm font-medium">
+            <Label htmlFor="modal-bio" className="text-xs flex items-center gap-1.5">
               <FileTextIcon className="size-3.5 text-muted-foreground" />
               Bio
             </Label>
             <Textarea
-              id="profile-bio"
+              id="modal-bio"
               value={form.bio}
               onChange={(e) => setForm({ ...form, bio: e.target.value })}
-              placeholder="Parlez un peu de vous..."
-              rows={3}
-              className="resize-none"
+              placeholder="Parlez-nous un peu de vous..."
+              rows={2}
+              className="text-sm resize-none"
             />
           </div>
 
-          {message && (
-            <p className={`text-sm rounded-md px-3 py-2 ${
-              message.type === "success"
-                ? "bg-green-50 text-green-700 border border-green-200"
-                : "bg-destructive/10 text-destructive border border-destructive/20"
-            }`}>
-              {message.text}
-            </p>
-          )}
-
-          <div className="flex justify-end gap-2 pt-1">
-            <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+          <div className="pt-2 flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+            >
               Annuler
             </Button>
-            <Button type="submit" disabled={isSaving} className="gap-2">
+            <Button type="submit" size="sm" disabled={isSaving} className="bg-emerald-600 hover:bg-emerald-700">
               {isSaving ? (
-                <Loader2Icon className="size-4 animate-spin" />
+                <>
+                  <Loader2Icon className="mr-1.5 size-3.5 animate-spin" />
+                  Enregistrement...
+                </>
               ) : (
-                <SaveIcon className="size-4" />
+                <>
+                  <SaveIcon className="mr-1.5 size-3.5" />
+                  Enregistrer
+                </>
               )}
-              Enregistrer
             </Button>
           </div>
         </form>

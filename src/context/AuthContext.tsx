@@ -1,30 +1,38 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
-import { getProfileById } from '@/lib/api/profiles';
-import { syncCartToDb } from '@/lib/api/cart';
+import { 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  signOut as firebaseSignOut, 
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  type User as FirebaseUser
+} from 'firebase/auth';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+import type { UserProfile } from '../types/database';
 
-import type { Database } from '../types/database';
-
-export type UserRole = Database['public']['Tables']['profiles']['Row']['role'];
-export type Profile = Database['public']['Tables']['profiles']['Row'];
-export type AuthUser = Profile & { is_blocked?: boolean };
+export type UserRole = 'client' | 'seller' | 'admin';
+export type Profile = UserProfile;
+export type AuthUser = UserProfile & { is_blocked?: boolean };
 
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<{ error?: string }>;
-  register: (data: RegisterData) => Promise<{ error?: string, emailConfirmationSent?: boolean }>;
+  register: (data: RegisterData) => Promise<{ error?: string; emailConfirmationSent?: boolean }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error?: string; success?: boolean }>;
 }
 
 interface RegisterData {
   email: string;
   password: string;
-  full_name: string;
+  nom: string;
+  prenom: string;
   phone?: string;
-  // role is removed as users are always created as 'client' initially
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,157 +41,153 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchProfile = useCallback(async (userId: string, accessToken?: string) => {
+  const fetchProfile = useCallback(async (uid: string) => {
     try {
-      const profile = await getProfileById(userId, accessToken);
-      setUser(profile as AuthUser);
-      return profile as AuthUser;
+      const userDocRef = doc(db, 'users', uid);
+      const snap = await getDoc(userDocRef);
+      if (snap.exists()) {
+        const data = snap.data() as UserProfile;
+        const profile: AuthUser = {
+          ...data,
+          id: uid,
+          full_name: `${data.prenom || ''} ${data.nom || ''}`.trim() || data.email.split('@')[0],
+          created_at: data.createdAt || data.created_at || new Date().toISOString(),
+          updated_at: data.updatedAt || data.updated_at || new Date().toISOString(),
+        };
+        setUser(profile);
+        return profile;
+      }
+      return null;
     } catch (err) {
-      console.error('Profile fetch error:', err);
+      console.error('Erreur de chargement du profil:', err);
       return null;
     }
   }, []);
 
-  const signOutBlockedUser = useCallback(async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-  }, []);
-
   const refreshUser = useCallback(async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session?.user) {
-      const profile = await fetchProfile(session.user.id, session.access_token);
-      if (profile?.is_blocked) {
-        await signOutBlockedUser();
-      }
+    if (auth.currentUser) {
+      await fetchProfile(auth.currentUser.uid);
     }
-  }, [fetchProfile, signOutBlockedUser]);
+  }, [fetchProfile]);
 
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.user) {
-          const profile = await fetchProfile(session.user.id, session.access_token);
-          if (profile?.is_blocked) {
-            await signOutBlockedUser();
-          }
-        }
-      } catch (err) {
-        console.log('Auth init error (expected in demo mode):', err);
-      } finally {
-        setIsLoading(false);
+    let unsubscribeSnapshot: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      if (unsubscribeSnapshot) {
+        unsubscribeSnapshot();
+        unsubscribeSnapshot = null;
       }
-    };
 
-    initAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (session?.user) {
-          const profile = await fetchProfile(session.user.id, session.access_token);
-          if (profile?.is_blocked) {
-            await signOutBlockedUser();
-          }
-        } else {
+      if (firebaseUser) {
+        const profile = await fetchProfile(firebaseUser.uid);
+        if (profile?.is_blocked || profile?.isBlocked) {
+          await firebaseSignOut(auth);
           setUser(null);
+        } else {
+          // Live profile updates listener
+          const userDocRef = doc(db, 'users', firebaseUser.uid);
+          unsubscribeSnapshot = onSnapshot(userDocRef, (snap) => {
+            if (snap.exists()) {
+              const data = snap.data() as UserProfile;
+              const updatedProfile: AuthUser = {
+                ...data,
+                id: firebaseUser.uid,
+                full_name: `${data.prenom || ''} ${data.nom || ''}`.trim() || data.email.split('@')[0],
+                created_at: data.createdAt || data.created_at || new Date().toISOString(),
+                updated_at: data.updatedAt || data.updated_at || new Date().toISOString(),
+              };
+              setUser(updatedProfile);
+            }
+          });
         }
-        setIsLoading(false);
+      } else {
+        setUser(null);
       }
-    );
-
-    return () => subscription.unsubscribe();
-  }, [fetchProfile, signOutBlockedUser]);
-
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const channel = supabase
-      .channel(`public:profiles:id=eq.${user.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${user.id}`,
-        },
-        () => {
-          void refreshUser();
-        }
-      )
-      .subscribe();
-
-    const handleFocus = () => {
-      void refreshUser();
-    };
-
-    window.addEventListener('focus', handleFocus);
+      setIsLoading(false);
+    });
 
     return () => {
-      supabase.removeChannel(channel);
-      window.removeEventListener('focus', handleFocus);
+      unsubscribeAuth();
+      if (unsubscribeSnapshot) unsubscribeSnapshot();
     };
-  }, [user?.id, refreshUser]);
+  }, [fetchProfile]);
 
   const login = async (email: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) return { error: error.message };
-      if (data.user) {
-        const profile = await fetchProfile(data.user.id, data.session?.access_token);
-        if (profile?.is_blocked) {
-          await signOutBlockedUser();
-          return { error: 'Votre compte est bloqué. Contactez un administrateur.' };
-        }
-        
-        if (profile?.role === 'client') {
-          await syncCartToDb(data.user.id);
-          window.dispatchEvent(new CustomEvent('cart-updated'));
-        }
+      const userCred = await signInWithEmailAndPassword(auth, email, password);
+      const profile = await fetchProfile(userCred.user.uid);
+      if (profile?.is_blocked || profile?.isBlocked) {
+        await firebaseSignOut(auth);
+        setUser(null);
+        return { error: 'Votre compte est bloqué. Contactez un administrateur.' };
       }
       return {};
     } catch (err: any) {
-      return { error: err.message };
+      let msg = err.message || 'Erreur lors de la connexion';
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        msg = 'Identifiants incorrects';
+      }
+      return { error: msg };
     }
   };
 
   const register = async (data: RegisterData) => {
     try {
-      const { data: authData, error } = await supabase.auth.signUp({
+      const userCred = await createUserWithEmailAndPassword(auth, data.email, data.password);
+      const uid = userCred.user.uid;
+
+      const newProfile: UserProfile = {
+        id: uid,
+        nom: data.nom,
+        prenom: data.prenom,
+        full_name: `${data.prenom} ${data.nom}`,
         email: data.email,
-        password: data.password,
-        options: {
-          data: {
-            full_name: data.full_name,
-          },
-        },
-      });
+        phone: data.phone || null,
+        role: 'client',
+        productCount: 0,
+        product_count: 0,
+        rating: 0,
+        isBlocked: false,
+        is_blocked: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-      if (error) return { error: error.message };
-
-      if (authData.user && !authData.session) {
-        return { emailConfirmationSent: true };
+      await setDoc(doc(db, 'users', uid), newProfile);
+      try {
+        await sendEmailVerification(userCred.user);
+      } catch (e) {
+        console.warn("Verification email notice:", e);
       }
-
-      if (authData.user) {
-        // Profile will be created by database trigger
-        await fetchProfile(authData.user.id, authData.session?.access_token);
-        await syncCartToDb(authData.user.id);
-        window.dispatchEvent(new CustomEvent('cart-updated'));
-      }
-      return {};
+      setUser(newProfile as AuthUser);
+      return { emailConfirmationSent: false };
     } catch (err: any) {
-      return { error: err.message };
+      let msg = err.message || "Erreur lors de l'inscription";
+      if (err.code === 'auth/email-already-in-use') {
+        msg = 'Cet email est déjà utilisé par un autre compte.';
+      }
+      return { error: msg };
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      return { success: true };
+    } catch (err: any) {
+      let msg = err.message || 'Erreur lors de l\'envoi de l\'email de réinitialisation';
+      if (err.code === 'auth/user-not-found') {
+        msg = 'Aucun compte associé à cet email.';
+      }
+      return { error: msg };
     }
   };
 
   const logout = async () => {
-    await supabase.auth.signOut();
+    await firebaseSignOut(auth);
     setUser(null);
   };
 
@@ -197,6 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         register,
         logout,
         refreshUser,
+        resetPassword,
       }}
     >
       {children}

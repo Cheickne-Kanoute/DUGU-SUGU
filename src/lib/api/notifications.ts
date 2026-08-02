@@ -1,58 +1,62 @@
-import { supabase } from '../supabase';
-import type { Database } from '../../types/database';
+import { 
+  collection, doc, getDocs, updateDoc, query, where, limit as limitConstraint, onSnapshot, writeBatch 
+} from 'firebase/firestore';
+import { db } from '../firebase';
+import type { Notification } from '../../types/database';
 
-export type Notification = Database['public']['Tables']['notifications']['Row'];
+export type { Notification };
 
 export async function getNotifications(userId: string) {
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(50);
+  const q = query(
+    collection(db, 'notifications'),
+    where('user_id', '==', userId),
+    limitConstraint(50)
+  );
+  const snap = await getDocs(q);
 
-  if (error) throw error;
-  return data as Notification[];
+  const notifications = snap.docs.map(d => {
+    const data = d.data() as Notification;
+    return {
+      ...data,
+      id: d.id,
+      title: data.title || data.titre || '',
+      read: data.read ?? data.lu ?? false,
+      created_at: data.created_at || data.createdAt || new Date().toISOString(),
+    };
+  });
+
+  return notifications.sort((a, b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime());
 }
 
 export async function markAsRead(notificationId: string) {
-  const { error } = await supabase
-    .from('notifications')
-    .update({ read: true } as never)
-    .eq('id', notificationId);
-
-  if (error) throw error;
+  const ref = doc(db, 'notifications', notificationId);
+  await updateDoc(ref, { read: true, lu: true });
 }
 
 export async function markAllAsRead(userId: string) {
-  const { error } = await supabase
-    .from('notifications')
-    .update({ read: true } as never)
-    .eq('user_id', userId)
-    .eq('read', false);
-
-  if (error) throw error;
+  const q = query(
+    collection(db, 'notifications'),
+    where('user_id', '==', userId),
+    where('read', '==', false)
+  );
+  const snap = await getDocs(q);
+  const batch = writeBatch(db);
+  snap.docs.forEach(d => batch.update(d.ref, { read: true, lu: true }));
+  await batch.commit();
 }
 
-// Subscribe to new notifications
 export function subscribeToNotifications(userId: string, callback: (payload: any) => void) {
-  const subscription = supabase
-    .channel(`notifications:${userId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${userId}`
-      },
-      (payload) => {
-        callback(payload.new);
-      }
-    )
-    .subscribe();
+  const q = query(
+    collection(db, 'notifications'),
+    where('user_id', '==', userId)
+  );
 
-  return () => {
-    supabase.removeChannel(subscription);
-  };
+  return onSnapshot(q, (snap) => {
+    snap.docChanges().forEach((change) => {
+      if (change.type === 'added') {
+        const data = change.doc.data();
+        callback({ ...data, id: change.doc.id });
+      }
+    });
+  });
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,41 +28,31 @@ export default function AdminOverview() {
       try {
         setError(null);
 
-        const [
-          { count: totalUsers, error: usersErr },
-          { count: totalSellers, error: sellersErr },
-          { count: totalProducts, error: productsErr },
-          { count: totalOrders, error: ordersErr },
-          { data: revenueData, error: revenueErr },
-          { count: pendingRequests, error: pendingErr },
-        ] = await Promise.all([
-          supabase.from('profiles').select('*', { count: 'exact', head: true }),
-          supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'seller'),
-          supabase.from('products').select('*', { count: 'exact', head: true }),
-          supabase.from('orders').select('*', { count: 'exact', head: true }),
-          supabase.from('orders').select('total').not('total', 'is', null),
-          supabase.from('seller_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+        const [usersSnap, sellersSnap, productsSnap, ordersSnap, reqsSnap] = await Promise.all([
+          getDocs(collection(db, 'users')),
+          getDocs(query(collection(db, 'users'), where('role', '==', 'seller'))),
+          getDocs(collection(db, 'produits')),
+          getDocs(collection(db, 'commandes')),
+          getDocs(query(collection(db, 'demandesVendeur'), where('status', '==', 'pending'))),
         ]);
 
-        const firstError = usersErr || sellersErr || productsErr || ordersErr || revenueErr || pendingErr;
-        if (firstError) throw firstError;
-
-        const totalRevenue = (revenueData ?? []).reduce(
-          (sum: number, row: { total: number }) => sum + (row.total ?? 0),
-          0
-        );
+        let totalRevenue = 0;
+        ordersSnap.docs.forEach(doc => {
+          const data = doc.data();
+          totalRevenue += Number(data.total || 0);
+        });
 
         setStats({
-          totalUsers: totalUsers ?? 0,
-          totalSellers: totalSellers ?? 0,
-          totalProducts: totalProducts ?? 0,
-          totalOrders: totalOrders ?? 0,
+          totalUsers: usersSnap.size,
+          totalSellers: sellersSnap.size,
+          totalProducts: productsSnap.size,
+          totalOrders: ordersSnap.size,
           totalRevenue,
-          pendingRequests: pendingRequests ?? 0,
+          pendingRequests: reqsSnap.size,
         });
       } catch (err) {
         console.error('Erreur stats admin:', err);
-        setError('Impossible de charger les statistiques. Vérifiez votre connexion.');
+        setError('Impossible de charger les statistiques.');
       } finally {
         setLoading(false);
       }
@@ -69,13 +60,12 @@ export default function AdminOverview() {
     fetchStats();
   }, []);
 
-
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'XOF', maximumFractionDigits: 0 }).format(amount);
 
   const kpiCards = [
     { title: 'Utilisateurs', value: stats?.totalUsers ?? '—', icon: <UsersIcon className="size-5 text-blue-400" />, color: 'from-blue-500/10 to-blue-500/5' },
-    { title: 'Vendeurs', value: stats?.totalSellers ?? '—', icon: <StoreIcon className="size-5 text-emerald-400" />, color: 'from-emerald-500/10 to-emerald-500/5' },
+    { title: 'Vendeurs (Producteurs)', value: stats?.totalSellers ?? '—', icon: <StoreIcon className="size-5 text-emerald-400" />, color: 'from-emerald-500/10 to-emerald-500/5' },
     { title: 'Produits', value: stats?.totalProducts ?? '—', icon: <PackageIcon className="size-5 text-amber-400" />, color: 'from-amber-500/10 to-amber-500/5' },
     { title: 'Commandes', value: stats?.totalOrders ?? '—', icon: <ShoppingCartIcon className="size-5 text-purple-400" />, color: 'from-purple-500/10 to-purple-500/5' },
   ];
@@ -83,15 +73,14 @@ export default function AdminOverview() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Vue d'ensemble</h1>
-        <p className="text-sm text-muted-foreground mt-1">Bienvenue, {user?.full_name}. Voici l'état de la plateforme.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Vue d'ensemble Admin</h1>
+        <p className="text-sm text-muted-foreground mt-1">Bienvenue, {user?.full_name}. Voici l'état de la plateforme DUGU SUGU.</p>
       </div>
 
-      {/* Bandeau d'erreur */}
       {error && (
         <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <AlertCircleIcon className="size-4 shrink-0" />
-          <span>{typeof error === 'string' ? error : (error?.message || JSON.stringify(error))}</span>
+          <span>{error}</span>
         </div>
       )}
 
@@ -116,7 +105,7 @@ export default function AdminOverview() {
 
       {/* Revenue + Pending Requests */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card className="bg-gradient-to-br from-primary/10 to-primary/5 border-border/50">
+        <Card className="bg-linear-to-br from-emerald-800 to-emerald-950 text-white border-0 shadow-lg">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Chiffre d'affaires total</CardTitle>
             <TrendingUpIcon className="size-5 text-primary" />

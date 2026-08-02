@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 
 interface SellerDashboardData {
@@ -21,7 +22,7 @@ export function useDashboardSeller() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user || user.role !== 'seller') {
+    if (!user || (user.role !== 'seller' && user.role !== 'admin')) {
       setIsLoading(false);
       return;
     }
@@ -33,56 +34,30 @@ export function useDashboardSeller() {
       setError(null);
 
       try {
-        const [
-          { data: ordersData, error: ordersError },
-          { data: recentOrdersData, error: recentOrdersError },
-          { data: productsData, error: productsError }
-        ] = await Promise.all([
-          // All orders for this seller
-          supabase.from('orders')
-            .select('total, status, created_at')
-            .eq('seller_id', user!.id),
-          
-          // Recent orders for this seller
-          supabase.from('orders')
-            .select(`
-              id,
-              total,
-              status,
-              created_at,
-              buyer:profiles!orders_buyer_id_fkey(full_name)
-            `)
-            .eq('seller_id', user!.id)
-            .order('created_at', { ascending: false })
-            .limit(10),
-
-          // All products for this seller (to calculate stock alerts)
-          supabase.from('products')
-            .select('id, name, stock, low_stock_threshold')
-            .eq('seller_id', user!.id)
+        const [ordersSnap, productsSnap] = await Promise.all([
+          getDocs(query(collection(db, 'commandes'), where('seller_id', '==', user!.id))),
+          getDocs(query(collection(db, 'produits'), where('seller_id', '==', user!.id))),
         ]);
-
-        if (ordersError) throw ordersError;
-        if (recentOrdersError) throw recentOrdersError;
-        if (productsError) throw productsError;
 
         if (!isMounted) return;
 
-        const orders = (ordersData as any[]) || [];
-        
+        const orders = ordersSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+        const products = productsSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
+
         let myRevenue = 0;
         let pendingOrders = 0;
         const revenueMap = new Map<string, number>();
 
         orders.forEach((order: any) => {
-          if (order.status !== 'cancelled') {
-            myRevenue += Number(order.total) || 0;
-            
-            const dateStr = new Date(order.created_at).toISOString().split('T')[0];
+          const status = order.status || order.statut;
+          const total = Number(order.total) || 0;
+          if (status !== 'cancelled') {
+            myRevenue += total;
+            const dateStr = new Date(order.created_at || order.dateCommande || new Date()).toISOString().split('T')[0];
             const currentRev = revenueMap.get(dateStr) || 0;
-            revenueMap.set(dateStr, currentRev + Number(order.total));
+            revenueMap.set(dateStr, currentRev + total);
           }
-          if (order.status === 'pending' || order.status === 'processing') {
+          if (status === 'pending' || status === 'processing') {
             pendingOrders++;
           }
         });
@@ -91,8 +66,7 @@ export function useDashboardSeller() {
           .map(([date, revenue]) => ({ date, revenue }))
           .sort((a, b) => a.date.localeCompare(b.date));
 
-        const products = productsData || [];
-        const lowStockProducts = (products as any[]).filter((p: any) => p.stock <= p.low_stock_threshold);
+        const lowStockProducts = products.filter(p => (p.stock ?? p.quantiteStock ?? 0) <= (p.low_stock_threshold ?? p.seuilStockBas ?? 10));
 
         setData({
           kpis: {
@@ -102,8 +76,8 @@ export function useDashboardSeller() {
             myRating: Number(user?.rating || 0),
           },
           revenueByDay,
-          recentOrders: recentOrdersData || [],
-          lowStockProducts: (lowStockProducts as any[]) || [],
+          recentOrders: orders.slice(0, 10),
+          lowStockProducts,
         });
 
       } catch (err: any) {

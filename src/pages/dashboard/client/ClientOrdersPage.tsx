@@ -1,12 +1,15 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { getOrders, type Order } from "@/lib/api/orders";
+import { getOrders, updateOrderStatus, type Order } from "@/lib/api/orders";
+import { getLivraisonByOrder, confirmerReception } from "@/lib/api/livraisons";
+import { getPaiementByOrder, confirmerPaiement } from "@/lib/api/paiements";
 import { Card, CardContent } from "@/components/ui/card";
 import { DashboardSectionHeader } from "@/components/dashboard/shared/DashboardSectionHeader";
 import { OrderStatusBadge } from "@/components/dashboard/shared/OrderStatusBadge";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
-import { ReceiptIcon, Loader2Icon, PackageIcon } from "lucide-react";
+import { ReceiptIcon, Loader2Icon, PackageIcon, CheckCircle2Icon } from "lucide-react";
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -28,6 +31,7 @@ export default function ClientOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -45,6 +49,30 @@ export default function ClientOrdersPage() {
 
     fetchOrders();
   }, [user]);
+
+  const handleConfirmerReception = async (orderId: string) => {
+    setConfirmingId(orderId);
+    try {
+      // 1. Update order status -> delivered
+      await updateOrderStatus(orderId, 'delivered');
+      
+      // 2. Confirmer livraison
+      const livraison = await getLivraisonByOrder(orderId);
+      if (livraison) await confirmerReception(livraison.id);
+      
+      // 3. Confirmer paiement
+      const paiement = await getPaiementByOrder(orderId);
+      if (paiement) await confirmerPaiement(paiement.id);
+
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'delivered' } : o));
+      setSelectedOrder(null);
+      toast.success('Réception et paiement confirmés avec succès !');
+    } catch (err: any) {
+      toast.error(err.message || 'Erreur lors de la confirmation');
+    } finally {
+      setConfirmingId(null);
+    }
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -76,7 +104,7 @@ export default function ClientOrdersPage() {
     <div className="space-y-6">
       <DashboardSectionHeader
         title="Mes Commandes"
-        description="Retrouvez l'historique complet de vos achats sur la plateforme."
+        description="Retrouvez l'historique de vos achats et confirmez la réception de vos produits."
       />
 
       <Card>
@@ -86,7 +114,7 @@ export default function ClientOrdersPage() {
               <ReceiptIcon className="size-16 text-muted-foreground/50 mb-4" />
               <h3 className="text-xl font-semibold mb-2">Aucune commande</h3>
               <p className="text-muted-foreground max-w-sm mb-6">
-                Vous n'avez pas encore passé de commande. Explorez nos produits pour trouver ce qu'il vous faut !
+                Vous n'avez pas encore passé de commande. Explorez nos produits !
               </p>
               <Button asChild>
                 <a href="/products">Parcourir les produits</a>
@@ -114,7 +142,7 @@ export default function ClientOrdersPage() {
                       {formatDistanceToNow(new Date(order.created_at), { addSuffix: true, locale: fr })}
                     </TableCell>
                     <TableCell>
-                      {order.seller?.full_name || 'Inconnu'}
+                      {order.seller?.full_name || 'Vendeur'}
                     </TableCell>
                     <TableCell>
                       <OrderStatusBadge status={order.status} />
@@ -122,7 +150,18 @@ export default function ClientOrdersPage() {
                     <TableCell className="text-right font-bold">
                       {formatCurrency(Number(order.total))}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right flex items-center justify-end gap-2">
+                      {order.status === 'shipped' && (
+                        <Button
+                          size="sm"
+                          className="bg-emerald-600 hover:bg-emerald-700 h-8"
+                          onClick={() => handleConfirmerReception(order.id)}
+                          disabled={confirmingId === order.id}
+                        >
+                          {confirmingId === order.id ? <Loader2Icon className="size-3.5 animate-spin mr-1" /> : <CheckCircle2Icon className="size-3.5 mr-1" />}
+                          Confirmer réception
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" onClick={() => setSelectedOrder(order)}>
                         Détails
                       </Button>
@@ -170,9 +209,9 @@ export default function ClientOrdersPage() {
               </div>
 
               <div>
-                <h4 className="font-semibold mb-3">Adresse de livraison fournie</h4>
+                <h4 className="font-semibold mb-3">Adresse de livraison</h4>
                 <div className="bg-muted p-3 rounded-md text-sm">
-                  {selectedOrder.shipping_address}
+                  {selectedOrder.shipping_address || 'Non spécifiée'}
                 </div>
               </div>
 
@@ -180,7 +219,7 @@ export default function ClientOrdersPage() {
                 <h4 className="font-semibold mb-3">Articles commandés</h4>
                 <div className="space-y-3">
                   {selectedOrder.items?.map((item: any) => (
-                    <div key={item.id} className="flex gap-3">
+                    <div key={item.id || item.product_id} className="flex gap-3">
                       <div className="h-12 w-12 rounded bg-muted flex items-center justify-center shrink-0">
                         {item.product?.images && item.product.images.length > 0 ? (
                           <img src={item.product.images[0]} alt={item.product.name} className="h-full w-full object-cover rounded" />
@@ -189,7 +228,7 @@ export default function ClientOrdersPage() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{item.product?.name || 'Produit inconnu'}</p>
+                        <p className="text-sm font-medium truncate">{item.product?.name || 'Produit'}</p>
                         <p className="text-xs text-muted-foreground">Qté: {item.quantity} × {formatCurrency(item.price_at_time)}</p>
                       </div>
                       <div className="text-right">
@@ -204,6 +243,24 @@ export default function ClientOrdersPage() {
                 <span className="font-bold text-lg">Total payé</span>
                 <span className="font-bold text-xl text-primary">{formatCurrency(Number(selectedOrder.total))}</span>
               </div>
+
+              {/* Confirmer la réception de la commande */}
+              {selectedOrder.status === 'shipped' && (
+                <div className="pt-4 border-t">
+                  <Button
+                    className="w-full bg-emerald-600 hover:bg-emerald-700"
+                    onClick={() => handleConfirmerReception(selectedOrder.id)}
+                    disabled={confirmingId === selectedOrder.id}
+                  >
+                    {confirmingId === selectedOrder.id ? (
+                      <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2Icon className="mr-2 h-4 w-4" />
+                    )}
+                    Confirmer la réception
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>

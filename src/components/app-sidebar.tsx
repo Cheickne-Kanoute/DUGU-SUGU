@@ -56,19 +56,19 @@ export function AppSidebar() {
 					{user && (
 						<SidebarMenuItem>
 							<SidebarMenuButton
-								render={<Link to="/profile" />}
+								render={<Link to={user.role === 'admin' ? '/admin/profile' : '/dashboard/profile'} />}
 								className="h-10"
 								tooltip={user.full_name}
 							>
-								<Avatar className="size-5 flex-shrink-0">
+								<Avatar className="size-5 shrink-0">
 									<AvatarImage src={user.avatar_url ?? undefined} />
 									<AvatarFallback className="text-[10px] bg-primary/10 text-primary font-semibold">
-										{getInitials(user.full_name)}
+										{getInitials(user.full_name || `${user.prenom || ''} ${user.nom || ''}` || 'DU')}
 									</AvatarFallback>
 								</Avatar>
 								<div className="flex flex-col items-start min-w-0">
-									<span className="text-xs font-medium truncate">{user.full_name}</span>
-									<span className="text-[10px] text-muted-foreground truncate">{user.email}</span>
+									<span className="text-xs font-medium truncate text-sidebar-foreground">{user.full_name}</span>
+									<span className="text-[10px] text-sidebar-foreground/70 truncate">{user.email}</span>
 								</div>
 							</SidebarMenuButton>
 						</SidebarMenuItem>

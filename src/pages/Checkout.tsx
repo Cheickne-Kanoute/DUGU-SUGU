@@ -3,11 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/hooks/useCart';
 import { createOrder } from '@/lib/api/orders';
-import { supabase } from '@/lib/supabase';
+import { createPaiement } from '@/lib/api/paiements';
+import { createLivraison } from '@/lib/api/livraisons';
+import { sendOrderConfirmationEmail } from '@/lib/api/email';
 import { toast } from 'sonner';
-import { MapPin, Phone, User, CheckCircle2 } from 'lucide-react';
-
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+import { MapPin, Phone, User, CheckCircle2, CreditCard } from 'lucide-react';
 
 export default function Checkout() {
   const { user, isAuthenticated } = useAuth();
@@ -18,7 +18,8 @@ export default function Checkout() {
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
-    address: ''
+    address: '',
+    modePaiement: 'livraison' as 'livraison' | 'mobile_money' | 'virement'
   });
 
   useEffect(() => {
@@ -29,12 +30,12 @@ export default function Checkout() {
     } else if (items.length === 0) {
       navigate('/cart');
     } else if (user) {
-      // Pré-remplir avec les infos de l'utilisateur
-      setFormData({
-        fullName: user.full_name || '',
+      setFormData(prev => ({
+        ...prev,
+        fullName: user.full_name || `${user.prenom || ''} ${user.nom || ''}`.trim(),
         phone: user.phone || '',
         address: user.address || user.location || ''
-      });
+      }));
     }
   }, [isAuthenticated, items.length, navigate, user, isLoadingCart]);
 
@@ -49,10 +50,10 @@ export default function Checkout() {
     setIsLoading(true);
 
     try {
-      // Grouper les articles par vendeur
+      // Group items by seller
       const itemsBySeller = items.reduce((acc, item) => {
         if (!item.product) return acc;
-        const sellerId = item.product.seller_id;
+        const sellerId = item.product.seller_id || item.product.vendeurId || 'default';
         if (!acc[sellerId]) {
           acc[sellerId] = [];
         }
@@ -60,7 +61,7 @@ export default function Checkout() {
         return acc;
       }, {} as Record<string, typeof items>);
 
-      // Créer une commande par vendeur
+      // Create order, paiement, & livraison per seller
       const orderPromises = Object.entries(itemsBySeller).map(async ([sellerId, sellerItems]) => {
         const sellerTotal = sellerItems.reduce((sum, item) => {
           return sum + ((item.product?.price || 0) * item.quantity);
@@ -68,69 +69,57 @@ export default function Checkout() {
 
         const orderData = {
           buyer_id: user!.id,
+          acheteurId: user!.id,
           seller_id: sellerId,
+          vendeurId: sellerId,
           status: 'pending' as const,
+          statut: 'pending' as const,
           total: sellerTotal,
-          shipping_address: `Nom: ${formData.fullName} | Tél: ${formData.phone} | Adresse: ${formData.address}`
+          shipping_address: `Nom: ${formData.fullName} | Tél: ${formData.phone} | Adresse: ${formData.address}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         };
 
         const orderItemsData = sellerItems.map(item => ({
           product_id: item.product!.id,
+          produitId: item.product!.id,
           quantity: item.quantity,
-          price_at_time: item.product!.price
+          quantite: item.quantity,
+          price_at_time: item.product!.price,
+          prixAuMoment: item.product!.price,
         }));
 
-        const order = await createOrder(orderData, orderItemsData) as any;
+        const order = await createOrder(orderData as any, orderItemsData as any);
 
-        // Fetch seller email and notify them
-        const { data: sellerProfile } = await (supabase as any)
-          .from('profiles')
-          .select('email, full_name')
-          .eq('id', sellerId)
-          .single();
+        await createPaiement({
+          order_id: order.id,
+          montant: sellerTotal,
+          mode_paiement: formData.modePaiement,
+          statut_paiement: 'en_attente',
+        });
 
-        if (sellerProfile?.email) {
-          fetch(`${API_BASE}/email/new-order-seller`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sellerEmail: sellerProfile.email,
-              sellerName: sellerProfile.full_name || 'Vendeur',
-              customerName: formData.fullName,
-              orderId: order.id,
-              totalAmount: sellerTotal
-            })
-          }).catch(console.error);
+        await createLivraison({
+          order_id: order.id,
+          adresse_livraison: formData.address,
+          statut_livraison: 'en_attente',
+        });
+
+        // 4. Send email notification
+        if (user?.email) {
+          sendOrderConfirmationEmail(user.email, order.id, sellerTotal).catch(() => {});
         }
 
         return order;
       });
 
-      const resolvedOrders = (await Promise.all(orderPromises)) as any[];
-      
-      // Envoi de l'email de confirmation
-      if (user?.email && resolvedOrders.length > 0) {
-        // On utilise l'ID de la première commande sous-jacente comme référence globale
-        const referenceId = resolvedOrders[0]?.id || `CMD-${Date.now()}`;
-        
-        fetch(`${API_BASE}/email/order-confirmation`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: user.email,
-            customerName: formData.fullName,
-            orderId: referenceId,
-            totalAmount: totalPrice
-          })
-        }).catch(err => console.error('Erreur lors de l\'envoi de l\'email de confirmation:', err));
-      }
+      await Promise.all(orderPromises);
 
-      toast.success('Votre commande a été passée avec succès !');
+      toast.success('Votre commande et paiement ont été enregistrés !');
       clearCart();
-      navigate('/');
+      navigate('/dashboard/purchases');
     } catch (error: any) {
       console.error('Erreur lors de la commande:', error);
-      toast.error(error?.message || (typeof error === 'string' ? error : 'Une erreur est survenue lors de la commande'));
+      toast.error(error?.message || 'Une erreur est survenue lors de la commande');
     } finally {
       setIsLoading(false);
     }
@@ -144,15 +133,15 @@ export default function Checkout() {
         <h1 className="text-2xl lg:text-[32px] font-bold text-[#1a1a1a] mb-8">Finaliser la Commande</h1>
 
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Formulaire de livraison */}
+          {/* Formulaire de livraison & paiement */}
           <div className="flex-1">
-            <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] p-6 md:p-8">
-              <h2 className="text-xl font-semibold text-[#1a1a1a] mb-6">Informations de Livraison</h2>
+            <div className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] p-6 md:p-8 space-y-6">
+              <h2 className="text-xl font-semibold text-[#1a1a1a]">Informations de Livraison</h2>
               
               <form id="checkout-form" onSubmit={handleCheckout} className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-[#1a1a1a] mb-1.5">
-                    Nom et Prénom
+                    Nom et Prénom (Acheteur)
                   </label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#888877]">
@@ -163,8 +152,8 @@ export default function Checkout() {
                       required
                       value={formData.fullName}
                       onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                      className="w-full pl-10 pr-4 py-3 bg-[#f8f6f0] border border-[#e0dec8] rounded-xl text-[#1a1a1a] placeholder:text-[#888877] focus:outline-none focus:ring-2 focus:ring-[#166534]/20 focus:border-[#166534] transition-all"
-                      placeholder="Jean Dupont"
+                      className="w-full pl-10 pr-4 py-3 bg-[#f8f6f0] border border-[#e0dec8] rounded-xl text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#166534]/20 focus:border-[#166534]"
+                      placeholder="Amadou Coulibaly"
                     />
                   </div>
                 </div>
@@ -182,7 +171,7 @@ export default function Checkout() {
                       required
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      className="w-full pl-10 pr-4 py-3 bg-[#f8f6f0] border border-[#e0dec8] rounded-xl text-[#1a1a1a] placeholder:text-[#888877] focus:outline-none focus:ring-2 focus:ring-[#166534]/20 focus:border-[#166534] transition-all"
+                      className="w-full pl-10 pr-4 py-3 bg-[#f8f6f0] border border-[#e0dec8] rounded-xl text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#166534]/20 focus:border-[#166534]"
                       placeholder="+223 00 00 00 00"
                     />
                   </div>
@@ -190,7 +179,7 @@ export default function Checkout() {
 
                 <div>
                   <label className="block text-sm font-medium text-[#1a1a1a] mb-1.5">
-                    Adresse complète
+                    Adresse de livraison
                   </label>
                   <div className="relative">
                     <div className="absolute top-3 left-3 pointer-events-none text-[#888877]">
@@ -200,9 +189,49 @@ export default function Checkout() {
                       required
                       value={formData.address}
                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                      className="w-full pl-10 pr-4 py-3 bg-[#f8f6f0] border border-[#e0dec8] rounded-xl text-[#1a1a1a] placeholder:text-[#888877] focus:outline-none focus:ring-2 focus:ring-[#166534]/20 focus:border-[#166534] transition-all resize-none h-28"
-                      placeholder="Quartier, Rue, Porte..."
+                      className="w-full pl-10 pr-4 py-3 bg-[#f8f6f0] border border-[#e0dec8] rounded-xl text-[#1a1a1a] resize-none h-24 focus:outline-none focus:ring-2 focus:ring-[#166534]/20 focus:border-[#166534]"
+                      placeholder="Bamako, Quartier, Rue, Porte..."
                     />
+                  </div>
+                </div>
+
+                {/* Mode de Paiement (PFE Diagramme de classe: modePaiement) */}
+                <div className="pt-4 border-t border-[#e0dec8]">
+                  <label className="block text-sm font-semibold text-[#1a1a1a] mb-3">
+                    Mode de Paiement (PFE)
+                  </label>
+                  <div className="space-y-3">
+                    <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${formData.modePaiement === 'livraison' ? 'border-[#166534] bg-[#f0fdf4]' : 'border-[#e0dec8] bg-white'}`}>
+                      <input
+                        type="radio"
+                        name="modePaiement"
+                        value="livraison"
+                        checked={formData.modePaiement === 'livraison'}
+                        onChange={() => setFormData({ ...formData, modePaiement: 'livraison' })}
+                        className="text-[#166534] focus:ring-[#166534]"
+                      />
+                      <CreditCard className="w-5 h-5 text-[#166534]" />
+                      <div>
+                        <p className="font-medium text-sm text-[#1a1a1a]">Paiement à la livraison (Espèces)</p>
+                        <p className="text-xs text-[#888877]">Réglez au livreur à la réception des produits</p>
+                      </div>
+                    </label>
+
+                    <label className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all ${formData.modePaiement === 'mobile_money' ? 'border-[#166534] bg-[#f0fdf4]' : 'border-[#e0dec8] bg-white'}`}>
+                      <input
+                        type="radio"
+                        name="modePaiement"
+                        value="mobile_money"
+                        checked={formData.modePaiement === 'mobile_money'}
+                        onChange={() => setFormData({ ...formData, modePaiement: 'mobile_money' })}
+                        className="text-[#166534] focus:ring-[#166534]"
+                      />
+                      <Phone className="w-5 h-5 text-orange-600" />
+                      <div>
+                        <p className="font-medium text-sm text-[#1a1a1a]">Mobile Money (Orange Money / Moov Money)</p>
+                        <p className="text-xs text-[#888877]">Paiement direct par transfert mobile</p>
+                      </div>
+                    </label>
                   </div>
                 </div>
               </form>
@@ -235,8 +264,8 @@ export default function Checkout() {
                   <span className="font-medium text-[#1a1a1a]">{totalPrice.toLocaleString('fr-FR')} FCFA</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[#555544]">Livraison</span>
-                  <span className="text-[#166534] font-medium">Paiement à la livraison</span>
+                  <span className="text-[#555544]">Mode de paiement</span>
+                  <span className="text-[#166534] font-medium capitalize">{formData.modePaiement.replace('_', ' ')}</span>
                 </div>
               </div>
 
@@ -250,7 +279,7 @@ export default function Checkout() {
               <div className="bg-[#e8f5e9] rounded-xl p-4 mb-6 flex gap-3 items-start">
                 <CheckCircle2 className="w-5 h-5 text-[#166534] shrink-0 mt-0.5" />
                 <p className="text-sm text-[#166534] leading-relaxed">
-                  Vous ne payez rien maintenant. Le paiement se fera directement à la livraison.
+                  Commande et paiement enregistrés selon le workflow du PFE.
                 </p>
               </div>
 

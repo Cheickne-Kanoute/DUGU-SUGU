@@ -75,7 +75,7 @@ export default function Products() {
     }
 
     // Default sorting: newest first
-    result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    result.sort((a, b) => new Date(b.created_at || b.createdAt || Date.now()).getTime() - new Date(a.created_at || a.createdAt || Date.now()).getTime());
 
     return result;
   }, [category, searchQuery, products]);

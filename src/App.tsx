@@ -68,6 +68,7 @@ export default function App() {
             }
           >
             <Route index element={<DashboardPage />} />
+            <Route path="profile" element={<ProfilePage />} />
             <Route path="become-seller" element={<BecomeSellerPage />} />
             <Route path="purchases" element={<ClientOrdersPage />} />
             <Route path="favorites" element={<ClientFavoritesPage />} />
@@ -98,11 +99,7 @@ export default function App() {
           </Route>
           <Route
             path="/profile"
-            element={ 
-              <ProtectedRoute>
-                <ProfilePage />
-              </ProtectedRoute>
-            }
+            element={<Navigate to="/dashboard/profile" replace />}
           />
           
           {/* ADMIN ROUTES */}
@@ -116,6 +113,7 @@ export default function App() {
           >
             <Route index element={<Navigate to="/admin/overview" replace />} />
             <Route path="overview" element={<AdminOverview />} />
+            <Route path="profile" element={<ProfilePage />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="categories" element={<AdminCategories />} />
             <Route path="seller-requests" element={<AdminSellerRequests />} />

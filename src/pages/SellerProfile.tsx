@@ -96,7 +96,7 @@ export default function SellerProfile() {
                 {seller.avatar_url ? (
                   <img src={seller.avatar_url} alt={seller.full_name} className="w-full h-full object-cover" />
                 ) : (
-                  <span className="text-3xl font-bold text-[#166534]">{getInitials(seller.full_name)}</span>
+                  <span className="text-3xl font-bold text-[#166534]">{getInitials(seller.full_name || `${seller.prenom || ''} ${seller.nom || ''}` || 'Vendeur')}</span>
                 )}
               </div>
             </div>

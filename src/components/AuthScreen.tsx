@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, Eye, EyeOff, Leaf } from 'lucide-react';
 import * as z from 'zod';
@@ -39,7 +39,7 @@ export function AuthScreen({ mode }: AuthScreenProps) {
 
   const registerForm = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
-    defaultValues: { full_name: '', email: '', phone: '', password: '', confirmPassword: '' },
+    defaultValues: { nom: '', prenom: '', email: '', phone: '', password: '', confirmPassword: '' },
   });
 
   useEffect(() => {
@@ -59,7 +59,7 @@ export function AuthScreen({ mode }: AuthScreenProps) {
     setLoginLoading(false);
 
     if (result.error) {
-      toast.error(typeof result.error === 'string' ? result.error : (result.error?.message || JSON.stringify(result.error)));
+      toast.error(typeof result.error === 'string' ? result.error : 'Erreur de connexion');
       return;
     }
 
@@ -71,13 +71,14 @@ export function AuthScreen({ mode }: AuthScreenProps) {
     const result = await register({
       email: data.email,
       password: data.password,
-      full_name: data.full_name,
+      nom: data.nom,
+      prenom: data.prenom,
       phone: data.phone,
-    } as any);
+    });
     setRegisterLoading(false);
 
     if (result.error) {
-      toast.error(typeof result.error === 'string' ? result.error : (result.error?.message || JSON.stringify(result.error)));
+      toast.error(typeof result.error === 'string' ? result.error : 'Erreur d\'inscription');
       return;
     }
 
@@ -91,7 +92,6 @@ export function AuthScreen({ mode }: AuthScreenProps) {
 
   return (
     <div className="relative w-full md:h-screen md:overflow-hidden">
-      {/* Particles background — style efferd/auth-1 */}
       <Particles
         className="absolute inset-0"
         color="#888888"
@@ -100,7 +100,6 @@ export function AuthScreen({ mode }: AuthScreenProps) {
       />
 
       <div className="relative mx-auto flex min-h-screen max-w-5xl flex-col justify-center px-8">
-        {/* Bouton retour */}
         <Link
           to="/"
           className="absolute top-4 left-4 inline-flex items-center gap-1 whitespace-nowrap rounded-[min(var(--radius-md),12px)] px-2.5 py-1 text-[0.8rem] font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
@@ -109,12 +108,10 @@ export function AuthScreen({ mode }: AuthScreenProps) {
           <span>Accueil</span>
         </Link>
 
-        <div className="mx-auto w-full space-y-6 sm:w-[360px]">
-          {/* Logo */}
+        <div className="mx-auto w-full space-y-6 sm:w-[380px]">
           <Logo className="h-6" />
 
           {emailSent ? (
-            /* ── État email envoyé ── */
             <div className="space-y-4 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted">
                 <Leaf className="h-7 w-7 text-muted-foreground" />
@@ -140,7 +137,6 @@ export function AuthScreen({ mode }: AuthScreenProps) {
             </div>
           ) : (
             <>
-              {/* ── Titre ── */}
               <div className="space-y-1">
                 <h1 className="text-2xl font-bold tracking-tight">
                   {mode === 'login' ? 'Connexion' : 'Créer un compte'}
@@ -152,7 +148,6 @@ export function AuthScreen({ mode }: AuthScreenProps) {
                 </p>
               </div>
 
-              {/* ── Formulaire ── */}
               {mode === 'login' ? (
                 <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
                   <div className="space-y-1.5">
@@ -173,12 +168,6 @@ export function AuthScreen({ mode }: AuthScreenProps) {
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <Label htmlFor="password">Mot de passe</Label>
-                      <button
-                        type="button"
-                        className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4"
-                      >
-                        Mot de passe oublié ?
-                      </button>
                     </div>
                     <div className="relative">
                       <Input
@@ -228,19 +217,37 @@ export function AuthScreen({ mode }: AuthScreenProps) {
                 </form>
               ) : (
                 <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="full_name">Nom complet</Label>
-                    <Input
-                      id="full_name"
-                      type="text"
-                      placeholder="Votre nom"
-                      {...registerForm.register('full_name')}
-                    />
-                    {registerForm.formState.errors.full_name && (
-                      <p className="text-xs text-destructive">
-                        {registerForm.formState.errors.full_name.message}
-                      </p>
-                    )}
+                  {/* Nom et Prénom */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="nom">Nom</Label>
+                      <Input
+                        id="nom"
+                        type="text"
+                        placeholder="Coulibaly"
+                        {...registerForm.register('nom')}
+                      />
+                      {registerForm.formState.errors.nom && (
+                        <p className="text-xs text-destructive">
+                          {registerForm.formState.errors.nom.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="prenom">Prénom</Label>
+                      <Input
+                        id="prenom"
+                        type="text"
+                        placeholder="Amadou"
+                        {...registerForm.register('prenom')}
+                      />
+                      {registerForm.formState.errors.prenom && (
+                        <p className="text-xs text-destructive">
+                          {registerForm.formState.errors.prenom.message}
+                        </p>
+                      )}
+                    </div>
                   </div>
 
                   <div className="space-y-1.5">
@@ -280,7 +287,7 @@ export function AuthScreen({ mode }: AuthScreenProps) {
                         <Input
                           id="register-password"
                           type={showRegisterPassword ? 'text' : 'password'}
-                          placeholder="Min. 6 caractères"
+                          placeholder="Min. 6 car."
                           {...registerForm.register('password')}
                           className="pr-10"
                         />
@@ -338,19 +345,6 @@ export function AuthScreen({ mode }: AuthScreenProps) {
                   </p>
                 </form>
               )}
-
-              {/* ── Mentions légales ── */}
-              <p className="text-xs text-muted-foreground">
-                En continuant, vous acceptez nos{' '}
-                <a href="#" className="underline underline-offset-4 hover:text-foreground">
-                  Conditions d'utilisation
-                </a>{' '}
-                et notre{' '}
-                <a href="#" className="underline underline-offset-4 hover:text-foreground">
-                  Politique de confidentialité
-                </a>
-                .
-              </p>
             </>
           )}
         </div>

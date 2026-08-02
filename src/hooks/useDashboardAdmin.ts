@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface AdminDashboardData {
   kpis: {
@@ -29,104 +30,55 @@ export function useDashboardAdmin() {
       setError(null);
 
       try {
-        // Run queries in parallel
-        const [
-          { data: ordersData, error: ordersError },
-          { count: activeSellersCount, error: sellersError },
-          { count: activeClientsCount, error: clientsError },
-          { count: pendingRequestsCount, error: requestsError },
-          { data: recentOrdersData, error: recentOrdersError },
-          { data: lowStockData, error: lowStockError },
-        ] = await Promise.all([
-          // All orders for KPI and Revenue
-          supabase.from('orders').select('total, status, created_at'),
-          
-          // Users count
-          supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'seller'),
-          supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'client'),
-          
-          // Pending requests
-          supabase.from('seller_requests').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-
-          // Recent orders with buyer and seller info
-          supabase.from('orders')
-            .select(`
-              id,
-              total,
-              status,
-              created_at,
-              buyer:profiles!orders_buyer_id_fkey(full_name),
-              seller:profiles!orders_seller_id_fkey(full_name)
-            `)
-            .order('created_at', { ascending: false })
-            .limit(10),
-
-          // Low stock products
-          supabase.from('products')
-            .select('id, name, stock, low_stock_threshold, seller:profiles!products_seller_id_fkey(full_name)')
-            .order('stock', { ascending: true })
-            .limit(10)
+        const [ordersSnap, sellersSnap, clientsSnap, requestsSnap, productsSnap] = await Promise.all([
+          getDocs(collection(db, 'commandes')),
+          getDocs(query(collection(db, 'users'), where('role', '==', 'seller'))),
+          getDocs(query(collection(db, 'users'), where('role', '==', 'client'))),
+          getDocs(query(collection(db, 'demandesVendeur'), where('status', '==', 'pending'))),
+          getDocs(collection(db, 'produits')),
         ]);
-
-        if (ordersError) throw ordersError;
-        if (sellersError) throw sellersError;
-        if (clientsError) throw clientsError;
-        if (requestsError) throw requestsError;
-        if (recentOrdersError) throw recentOrdersError;
-        if (lowStockError) throw lowStockError;
 
         if (!isMounted) return;
 
-        // Process Orders Data
-        const orders = ordersData || [];
-        
+        const orders = ordersSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
         let totalRevenue = 0;
         let cancelledCount = 0;
         const revenueMap = new Map<string, number>();
 
         orders.forEach((order: any) => {
-          if (order.status !== 'cancelled') {
-            totalRevenue += Number(order.total) || 0;
-            
-            // Format date for chart (e.g. YYYY-MM-DD)
-            const dateStr = new Date(order.created_at).toISOString().split('T')[0];
+          const status = order.status || order.statut;
+          const total = Number(order.total) || 0;
+          if (status !== 'cancelled') {
+            totalRevenue += total;
+            const dateStr = new Date(order.created_at || order.dateCommande || new Date()).toISOString().split('T')[0];
             const currentRev = revenueMap.get(dateStr) || 0;
-            revenueMap.set(dateStr, currentRev + Number(order.total));
+            revenueMap.set(dateStr, currentRev + total);
           } else {
             cancelledCount++;
           }
         });
 
         const cancellationRate = orders.length > 0 ? (cancelledCount / orders.length) * 100 : 0;
-        
         const revenueByDay = Array.from(revenueMap.entries())
           .map(([date, revenue]) => ({ date, revenue }))
           .sort((a, b) => a.date.localeCompare(b.date));
 
-        // Let's create a mockup for top sellers if we don't have a specific RPC yet.
-        // In a real app we'd do a group by in SQL. For now we just return an empty array
-        // or a basic mock to be replaced by a real view later.
-        const topSellers: any[] = [];
-
-        // Low stock: ensure we got data from the fallback
-        let lowStockProducts = [];
-        if (lowStockData) {
-            // filter manually in js for fallback
-            lowStockProducts = (lowStockData as any[]).filter(p => p.stock <= p.low_stock_threshold);
-        }
+        const lowStockProducts = productsSnap.docs
+          .map(d => ({ id: d.id, ...d.data() as any }))
+          .filter(p => (p.stock ?? p.quantiteStock ?? 0) <= (p.low_stock_threshold ?? p.seuilStockBas ?? 10));
 
         setData({
           kpis: {
             totalRevenue,
             totalOrders: orders.length,
-            activeSellers: activeSellersCount || 0,
-            totalClients: activeClientsCount || 0,
-            pendingRequests: pendingRequestsCount || 0,
+            activeSellers: sellersSnap.size,
+            totalClients: clientsSnap.size,
+            pendingRequests: requestsSnap.size,
             cancellationRate,
           },
           revenueByDay,
-          recentOrders: recentOrdersData || [],
-          topSellers,
+          recentOrders: orders.slice(0, 10),
+          topSellers: [],
           lowStockProducts,
         });
 

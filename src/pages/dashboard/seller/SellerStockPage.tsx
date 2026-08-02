@@ -5,8 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/context/AuthContext";
-import { updateProduct, type Product } from "@/lib/api/products";
-import { supabase } from "@/lib/supabase";
+import { updateProduct, getProducts, type Product } from "@/lib/api/products";
 import { Loader2Icon, SaveIcon } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,14 +28,7 @@ export default function SellerStockPage() {
       if (!user?.id) return;
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from("products")
-          .select("*, categories:category_id(name)")
-          .eq("seller_id", user.id)
-          .order("name", { ascending: true });
-
-        if (error) throw error;
-        const typedData = (data as unknown as Product[]) || [];
+        const typedData = await getProducts({ sellerId: user.id });
         setProducts(typedData);
         
         // Initialize edits state

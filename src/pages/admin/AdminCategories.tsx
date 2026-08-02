@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { getCategories } from '@/lib/api/categories';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,13 +12,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { PlusIcon, PencilIcon, Trash2Icon, TagIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
-
 interface Category {
   id: string;
   name: string;
-  description?: string;
-  product_count: number;
+  nom?: string;
+  description?: string | null;
+  product_count?: number;
 }
 
 const slugify = (text: string) =>
@@ -35,22 +35,14 @@ export default function AdminCategories() {
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const getToken = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token;
-  };
-
   const fetchCategories = useCallback(async () => {
     setLoading(true);
     try {
-      const token = await getToken();
-      const res = await fetch(`${API_BASE}/admin/categories`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (res.ok) setCategories(data);
+      const data = await getCategories();
+      setCategories(data);
     } catch (err) {
       console.error(err);
+      toast.error('Erreur de chargement');
     } finally {
       setLoading(false);
     }
@@ -66,41 +58,29 @@ export default function AdminCategories() {
 
   const openEdit = (cat: Category) => {
     setEditTarget(cat);
-    setForm({ id: cat.id, name: cat.name, description: cat.description || '' });
+    setForm({ id: cat.id, name: cat.name || cat.nom || '', description: cat.description || '' });
     setModalOpen(true);
   };
 
-  const handleNameChange = (name: string) => {
-    setForm(f => ({ ...f, name, id: editTarget ? f.id : slugify(name) }));
-  };
-
   const handleSave = async () => {
-    if (!form.name.trim()) return;
+    if (!form.name.trim()) { toast.error('Nom requis'); return; }
     setSaving(true);
     try {
-      const token = await getToken();
-      const isEdit = !!editTarget;
-      const url = isEdit
-        ? `${API_BASE}/admin/categories/${editTarget!.id}`
-        : `${API_BASE}/admin/categories`;
-      const method = isEdit ? 'PUT' : 'POST';
-      const body = isEdit
-        ? { name: form.name, description: form.description }
-        : { id: form.id, name: form.name, description: form.description };
+      const catId = editTarget ? editTarget.id : (form.id || slugify(form.name));
+      const payload = {
+        id: catId,
+        name: form.name.trim(),
+        nom: form.name.trim(),
+        description: form.description.trim() || '',
+        image: `/images/categories/${catId}.jpg`,
+      };
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success(isEdit ? 'Catégorie mise à jour' : 'Catégorie créée');
-        setModalOpen(false);
-        fetchCategories();
-      } else {
-        toast.error(typeof data.error === 'string' ? data.error : (data.error?.message || 'Erreur'));
-      }
+      await setDoc(doc(db, 'categories', catId), payload);
+      toast.success(editTarget ? 'Catégorie modifiée' : 'Catégorie créée');
+      setModalOpen(false);
+      fetchCategories();
+    } catch (err: any) {
+      toast.error(err.message || 'Erreur lors de la sauvegarde');
     } finally {
       setSaving(false);
     }
@@ -110,19 +90,12 @@ export default function AdminCategories() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      const token = await getToken();
-      const res = await fetch(`${API_BASE}/admin/categories/${deleteTarget.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success('Catégorie supprimée');
-        setDeleteTarget(null);
-        fetchCategories();
-      } else {
-        toast.error(typeof data.error === 'string' ? data.error : (data.error?.message || 'Erreur'));
-      }
+      await deleteDoc(doc(db, 'categories', deleteTarget.id));
+      setCategories(prev => prev.filter(c => c.id !== deleteTarget.id));
+      toast.success('Catégorie supprimée');
+      setDeleteTarget(null);
+    } catch (err: any) {
+      toast.error(err.message || 'Erreur lors de la suppression');
     } finally {
       setDeleting(false);
     }
@@ -132,132 +105,85 @@ export default function AdminCategories() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Catégories</h1>
-          <p className="text-sm text-muted-foreground mt-1">{categories.length} catégorie(s) — CRUD complet</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Catégories de Produits</h1>
+          <p className="text-sm text-muted-foreground mt-1">Gérez la classification des produits agricoles sur Dugu Sugu.</p>
         </div>
-        <Button onClick={openCreate} className="gap-2">
-          <PlusIcon className="size-4" />
-          Nouvelle catégorie
+        <Button onClick={openCreate} className="bg-emerald-600 hover:bg-emerald-700">
+          <PlusIcon className="mr-2 size-4" /> Nouvelle Catégorie
         </Button>
       </div>
 
-      <Card className="border-border/50">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border/50 bg-muted/30">
-                  <th className="text-left p-4 font-medium text-muted-foreground">ID (slug)</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Nom</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Description</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Produits</th>
-                  <th className="text-right p-4 font-medium text-muted-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <tr key={i} className="border-b border-border/30">
-                      {Array.from({ length: 5 }).map((_, j) => (
-                        <td key={j} className="p-4"><div className="h-4 bg-muted animate-pulse rounded w-20" /></td>
-                      ))}
-                    </tr>
-                  ))
-                ) : categories.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="p-8 text-center text-muted-foreground">
-                      <TagIcon className="size-8 mx-auto mb-2 opacity-40" />
-                      Aucune catégorie
-                    </td>
-                  </tr>
-                ) : categories.map(cat => (
-                  <tr key={cat.id} className="border-b border-border/30 hover:bg-muted/20 transition-colors">
-                    <td className="p-4">
-                      <code className="text-xs bg-muted px-2 py-0.5 rounded font-mono">{cat.id}</code>
-                    </td>
-                    <td className="p-4 font-medium">{cat.name}</td>
-                    <td className="p-4 text-muted-foreground max-w-xs truncate">{cat.description || '—'}</td>
-                    <td className="p-4">
-                      <Badge variant={cat.product_count > 0 ? 'default' : 'secondary'}>
-                        {cat.product_count} produit{cat.product_count !== 1 ? 's' : ''}
-                      </Badge>
-                    </td>
-                    <td className="p-4">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" className="size-8" onClick={() => openEdit(cat)}>
-                          <PencilIcon className="size-3.5" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => setDeleteTarget(cat)}
-                        >
-                          <Trash2Icon className="size-3.5" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+      <Card>
+        <CardContent className="p-4">
+          {loading ? (
+            <div className="py-12 text-center text-muted-foreground text-sm">Chargement...</div>
+          ) : categories.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground text-sm">Aucune catégorie.</div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {categories.map((c) => (
+                <div key={c.id} className="p-4 rounded-lg border bg-card flex flex-col justify-between space-y-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded bg-primary/10 text-primary">
+                      <TagIcon className="size-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-base">{c.name || c.nom}</h3>
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                        {c.description || 'Pas de description'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2 border-t text-xs">
+                    <Button variant="ghost" size="sm" onClick={() => openEdit(c)}>
+                      <PencilIcon className="mr-1 size-3.5" /> Modifier
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(c)} className="text-destructive">
+                      <Trash2Icon className="mr-1 size-3.5" /> Supprimer
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Create / Edit Dialog */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-112.5">
           <DialogHeader>
             <DialogTitle>{editTarget ? 'Modifier la catégorie' : 'Nouvelle catégorie'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="cat-name">Nom</Label>
-              <Input id="cat-name" placeholder="ex: Légumes frais" value={form.name}
-                onChange={e => handleNameChange(e.target.value)} />
+            <div className="space-y-1.5">
+              <Label htmlFor="name">Nom de la catégorie</Label>
+              <Input id="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="ex: Légumes, Fruits, Céréales..." />
             </div>
-            {!editTarget && (
-              <div className="space-y-2">
-                <Label htmlFor="cat-id">ID (slug)</Label>
-                <Input id="cat-id" placeholder="ex: legumes-frais" value={form.id}
-                  onChange={e => setForm(f => ({ ...f, id: e.target.value }))} />
-                <p className="text-xs text-muted-foreground">Généré automatiquement, modifiable.</p>
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="cat-desc">Description</Label>
-              <Textarea id="cat-desc" placeholder="Description de la catégorie..." value={form.description}
-                onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3} />
+            <div className="space-y-1.5">
+              <Label htmlFor="description">Description (optionnelle)</Label>
+              <Textarea id="description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} placeholder="Description..." />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setModalOpen(false)}>Annuler</Button>
-            <Button onClick={handleSave} disabled={saving || !form.name.trim()}>
-              {saving ? 'Enregistrement...' : (editTarget ? 'Modifier' : 'Créer')}
+            <Button onClick={handleSave} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700">
+              {saving ? 'Enregistrement...' : 'Enregistrer'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirm */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={open => !open && setDeleteTarget(null)}>
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer « {deleteTarget?.name} » ?</AlertDialogTitle>
+            <AlertDialogTitle>Supprimer la catégorie ?</AlertDialogTitle>
             <AlertDialogDescription>
-              {deleteTarget?.product_count && deleteTarget.product_count > 0
-                ? `Cette catégorie est liée à ${deleteTarget.product_count} produit(s) et ne peut pas être supprimée.`
-                : 'Cette action est irréversible.'}
+              Êtes-vous sûr de vouloir supprimer "{deleteTarget?.name}" ?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={deleting || (deleteTarget?.product_count ?? 0) > 0}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
+            <AlertDialogAction onClick={handleDelete} disabled={deleting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
               {deleting ? 'Suppression...' : 'Supprimer'}
             </AlertDialogAction>
           </AlertDialogFooter>

@@ -30,8 +30,8 @@ export function LogoCloud() {
 
 const logos = [
 	{
-		src: "https://storage.efferd.com/logo/supabase-wordmark.svg",
-		alt: "Supabase Logo",
+		src: "https://www.vectorlogo.zone/logos/firebase/firebase-wordmark.svg",
+		alt: "Firebase Logo",
 	},
 	{
 		src: "https://storage.efferd.com/logo/openai-wordmark.svg",

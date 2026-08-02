@@ -1,13 +1,15 @@
-import { supabase } from '../supabase';
-import type { Database } from '../../types/database';
+import { 
+  collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, where, writeBatch 
+} from 'firebase/firestore';
+import { db } from '../firebase';
+import type { PanierItem, Produit, UserProfile } from '../../types/database';
 
-export type CartItem = Database['public']['Tables']['cart_items']['Row'] & {
-  product?: Database['public']['Tables']['products']['Row'] & {
-    seller?: Pick<Database['public']['Tables']['profiles']['Row'], 'full_name' | 'avatar_url'>;
+export type CartItem = PanierItem & {
+  product?: Produit & {
+    seller?: Pick<UserProfile, 'full_name' | 'avatar_url'>;
   };
 };
 
-// Fallback to local storage for guests
 const LOCAL_CART_KEY = 'dugu_sugu_local_cart';
 
 function getLocalCart(): any[] {
@@ -27,38 +29,64 @@ export async function getCart(userId?: string): Promise<CartItem[]> {
   if (!userId) {
     const localCart = getLocalCart();
     if (localCart.length === 0) return [];
-    
-    const productIds = localCart.map(item => item.product_id);
-    const { data: products, error } = await (supabase as any)
-      .from('products')
-      .select('*, seller:seller_id(full_name, avatar_url)')
-      .in('id', productIds);
-      
-    if (error) {
-      console.error('Failed to load local cart products', error);
-      return localCart;
-    }
-    
-    return localCart.map(item => ({
-      ...item,
-      product: products.find((p: any) => p.id === item.product_id)
+
+    const items = await Promise.all(localCart.map(async (item) => {
+      try {
+        const pSnap = await getDoc(doc(db, 'produits', item.product_id));
+        if (pSnap.exists()) {
+          const pData = pSnap.data() as Produit;
+          return {
+            ...item,
+            product: { ...pData, id: pSnap.id },
+          };
+        }
+      } catch (e) {}
+      return item;
     }));
+
+    return items;
   }
 
-  const { data, error } = await (supabase as any)
-    .from('cart_items')
-    .select(`
-      *,
-      product:product_id(
-        *,
-        seller:seller_id(full_name, avatar_url)
-      )
-    `)
-    .eq('user_id', userId)
-    .order('created_at', { ascending: true });
+  const q = query(collection(db, 'panierItems'), where('user_id', '==', userId));
+  const snap = await getDocs(q);
 
-  if (error) throw error;
-  return data as CartItem[];
+  const cartItems = await Promise.all(snap.docs.map(async (d) => {
+    const data = d.data() as PanierItem;
+    const item: CartItem = {
+      ...data,
+      id: d.id,
+      user_id: data.user_id || data.userId || '',
+      product_id: data.product_id || data.produitId || '',
+      quantity: data.quantity ?? data.quantite ?? 1,
+    };
+
+    if (item.product_id) {
+      try {
+        const pSnap = await getDoc(doc(db, 'produits', item.product_id));
+        if (pSnap.exists()) {
+          const pData = pSnap.data() as Produit;
+          const prod: any = { ...pData, id: pSnap.id };
+
+          const sellerId = pData.seller_id || pData.vendeurId;
+          if (sellerId) {
+            const sSnap = await getDoc(doc(db, 'users', sellerId));
+            if (sSnap.exists()) {
+              const sData = sSnap.data() as UserProfile;
+              prod.seller = {
+                full_name: sData.full_name || `${sData.prenom || ''} ${sData.nom || ''}`.trim(),
+                avatar_url: sData.avatar_url,
+              };
+            }
+          }
+          item.product = prod;
+        }
+      } catch (e) {}
+    }
+
+    return item;
+  }));
+
+  return cartItems;
 }
 
 export async function addToCart(productId: string, quantity: number, userId?: string) {
@@ -74,31 +102,33 @@ export async function addToCart(productId: string, quantity: number, userId?: st
     return cart;
   }
 
-  // Check if exists in DB
-  const { data: existing } = await (supabase as any)
-    .from('cart_items')
-    .select('*')
-    .eq('user_id', userId)
-    .eq('product_id', productId)
-    .maybeSingle();
+  // Check if item exists in Firestore
+  const q = query(
+    collection(db, 'panierItems'),
+    where('user_id', '==', userId),
+    where('product_id', '==', productId)
+  );
+  const snap = await getDocs(q);
 
-  if (existing) {
-    const { data, error } = await (supabase as any)
-      .from('cart_items')
-      .update({ quantity: existing.quantity + quantity })
-      .eq('id', existing.id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  if (!snap.empty) {
+    const existingDoc = snap.docs[0];
+    const newQty = (existingDoc.data().quantity || 1) + quantity;
+    await updateDoc(doc(db, 'panierItems', existingDoc.id), { quantity: newQty, quantite: newQty });
+    return { id: existingDoc.id, ...existingDoc.data(), quantity: newQty };
   } else {
-    const { data, error } = await (supabase as any)
-      .from('cart_items')
-      .insert([{ user_id: userId, product_id: productId, quantity }])
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const now = new Date().toISOString();
+    const newItem = {
+      user_id: userId,
+      userId,
+      product_id: productId,
+      produitId: productId,
+      quantity,
+      quantite: quantity,
+      created_at: now,
+      createdAt: now,
+    };
+    const docRef = await addDoc(collection(db, 'panierItems'), newItem);
+    return { id: docRef.id, ...newItem };
   }
 }
 
@@ -116,18 +146,13 @@ export async function updateCartItem(itemId: string, quantity: number, userId?: 
   }
 
   if (quantity <= 0) {
-    const { error } = await supabase.from('cart_items').delete().eq('id', itemId);
-    if (error) throw error;
+    await deleteDoc(doc(db, 'panierItems', itemId));
     return null;
   } else {
-    const { data, error } = await (supabase as any)
-      .from('cart_items')
-      .update({ quantity })
-      .eq('id', itemId)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+    const itemRef = doc(db, 'panierItems', itemId);
+    await updateDoc(itemRef, { quantity, quantite: quantity });
+    const snap = await getDoc(itemRef);
+    return { id: itemId, ...snap.data() };
   }
 }
 
@@ -136,12 +161,14 @@ export async function clearCart(userId?: string) {
     localStorage.removeItem(LOCAL_CART_KEY);
     return;
   }
-  
-  const { error } = await supabase.from('cart_items').delete().eq('user_id', userId);
-  if (error) throw error;
+
+  const q = query(collection(db, 'panierItems'), where('user_id', '==', userId));
+  const snap = await getDocs(q);
+  const batch = writeBatch(db);
+  snap.docs.forEach(d => batch.delete(d.ref));
+  await batch.commit();
 }
 
-// Sync local cart to DB after login
 export async function syncCartToDb(userId: string) {
   const localCart = getLocalCart();
   if (localCart.length === 0) return;
@@ -149,6 +176,6 @@ export async function syncCartToDb(userId: string) {
   for (const item of localCart) {
     await addToCart(item.product_id, item.quantity, userId);
   }
-  
+
   localStorage.removeItem(LOCAL_CART_KEY);
 }

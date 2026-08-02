@@ -9,9 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
-import { createProduct, deleteProduct, updateProduct, type Product } from "@/lib/api/products";
+import { createProduct, deleteProduct, updateProduct, getProducts, type Product } from "@/lib/api/products";
+import { getCategories } from "@/lib/api/categories";
 import { uploadProductImages } from "@/lib/api/upload";
-import { supabase } from "@/lib/supabase";
 import { Loader2Icon, PencilIcon, PlusIcon, Trash2Icon, XIcon } from "lucide-react";
 import { toast } from "sonner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -72,6 +72,7 @@ export default function SellerProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [form, setForm] = useState<ProductFormState>(initialForm());
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [imageUrlInput, setImageUrlInput] = useState("");
 
   const categoryLabelById = useMemo(
     () => new Map(categories.map((category) => [category.id, category.name])),
@@ -85,9 +86,8 @@ export default function SellerProductsPage() {
       !!form.name.trim() &&
       !!form.description.trim() &&
       !!form.price &&
-      (form.images.length > 0 || selectedFiles.length > 0) &&
       !!form.unit.trim(),
-    [form, selectedFiles, user?.id]
+    [form, user?.id]
   );
 
   useEffect(() => {
@@ -97,19 +97,12 @@ export default function SellerProductsPage() {
       setLoading(true);
       try {
         const [productsRes, categoriesRes] = await Promise.all([
-          supabase
-            .from("products")
-            .select("*, categories:category_id(name, image)")
-            .eq("seller_id", user.id)
-            .order("created_at", { ascending: false }),
-          supabase.from("categories").select("id, name").order("name", { ascending: true }),
+          getProducts({ sellerId: user.id }),
+          getCategories(),
         ]);
 
-        if (productsRes.error) throw productsRes.error;
-        if (categoriesRes.error) throw categoriesRes.error;
-
-        setProducts((productsRes.data || []) as Product[]);
-        setCategories((categoriesRes.data || []) as Category[]);
+        setProducts(productsRes || []);
+        setCategories(categoriesRes || []);
       } catch (err: any) {
         toast.error(err.message || "Impossible de charger les produits");
       } finally {
@@ -155,21 +148,36 @@ export default function SellerProductsPage() {
 
     setSaving(true);
     try {
-      let uploadedUrls: string[] = [];
+      let finalImages = [...form.images];
       if (selectedFiles.length > 0) {
-        uploadedUrls = await uploadProductImages(selectedFiles);
+        const uploadedUrls = await uploadProductImages(selectedFiles, user.id);
+        finalImages = [...finalImages, ...uploadedUrls];
+      }
+      if (finalImages.length === 0) {
+        finalImages = ["https://images.unsplash.com/photo-1542838132-92c53300491e?w=500&auto=format&fit=crop"];
       }
 
       const payload = {
         seller_id: user.id,
+        vendeurId: user.id,
         category_id: form.category_id,
+        categorieId: form.category_id,
         name: form.name.trim(),
+        nomProduit: form.name.trim(),
         description: form.description.trim(),
         price: Number(form.price),
-        images: [...form.images, ...uploadedUrls],
+        prix: Number(form.price),
+        images: finalImages,
         stock: Number(form.stock || 0),
+        quantiteStock: Number(form.stock || 0),
         unit: form.unit.trim(),
+        unite: form.unit.trim(),
         low_stock_threshold: Number(form.low_stock_threshold || 10),
+        seuilStockBas: Number(form.low_stock_threshold || 10),
+        is_bio: false,
+        isBio: false,
+        available: true,
+        disponible: true,
       };
 
       if (editingProduct) {
@@ -395,14 +403,17 @@ export default function SellerProductsPage() {
               />
             </div>
 
-            <div className="space-y-2 md:col-span-2">
-              <Label>Images du produit</Label>
+            <div className="space-y-3 md:col-span-2">
+              <Label className="font-medium text-sm">Images du produit</Label>
+              
+              {/* Previews */}
               <div className="flex flex-wrap gap-2 mb-2">
                 {form.images.map((img, idx) => (
-                  <div key={idx} className="relative h-16 w-16 border rounded overflow-hidden group">
+                  <div key={idx} className="relative h-20 w-20 border rounded-lg overflow-hidden group shadow-xs">
                     <img src={img} alt="preview" className="h-full w-full object-cover" />
                     <button
-                      className="absolute top-0 right-0 bg-destructive text-destructive-foreground p-0.5"
+                      type="button"
+                      className="absolute top-1 right-1 bg-destructive text-white rounded-full p-1 shadow-md hover:bg-destructive/90"
                       onClick={() => setForm(c => ({ ...c, images: c.images.filter((_, i) => i !== idx) }))}
                     >
                       <XIcon className="size-3" />
@@ -410,10 +421,11 @@ export default function SellerProductsPage() {
                   </div>
                 ))}
                 {selectedFiles.map((file, idx) => (
-                  <div key={idx} className="relative h-16 w-16 border rounded overflow-hidden group">
-                    <img src={URL.createObjectURL(file)} alt="preview" className="h-full w-full object-cover opacity-70" />
+                  <div key={`file-${idx}`} className="relative h-20 w-20 border rounded-lg overflow-hidden group shadow-xs">
+                    <img src={URL.createObjectURL(file)} alt="preview" className="h-full w-full object-cover" />
                     <button
-                      className="absolute top-0 right-0 bg-destructive text-destructive-foreground p-0.5"
+                      type="button"
+                      className="absolute top-1 right-1 bg-destructive text-white rounded-full p-1 shadow-md hover:bg-destructive/90"
                       onClick={() => setSelectedFiles(c => c.filter((_, i) => i !== idx))}
                     >
                       <XIcon className="size-3" />
@@ -421,17 +433,62 @@ export default function SellerProductsPage() {
                   </div>
                 ))}
               </div>
-              <Input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => {
-                  if (e.target.files) {
-                    setSelectedFiles(c => [...c, ...Array.from(e.target.files!)]);
-                  }
-                  e.target.value = "";
-                }}
-              />
+
+              {/* Upload file input */}
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Importer depuis votre ordinateur :</Label>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      const newFiles = Array.from(e.target.files);
+                      setSelectedFiles(c => [...c, ...newFiles]);
+                      
+                      // Convert instantly to Base64 for immediate display & fallback
+                      newFiles.forEach((file) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          if (reader.result) {
+                            setForm(c => ({
+                              ...c,
+                              images: Array.from(new Set([...c.images, reader.result as string])),
+                            }));
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      });
+                    }
+                    e.target.value = "";
+                  }}
+                />
+              </div>
+
+              {/* Add image by direct URL */}
+              <div className="space-y-1 pt-1">
+                <Label className="text-xs text-muted-foreground">Ou ajouter le lien d'une image (URL) :</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="url"
+                    placeholder="https://images.unsplash.com/photo-..."
+                    value={imageUrlInput}
+                    onChange={(e) => setImageUrlInput(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      if (imageUrlInput.trim()) {
+                        setForm(c => ({ ...c, images: [...c.images, imageUrlInput.trim()] }));
+                        setImageUrlInput("");
+                      }
+                    }}
+                  >
+                    Ajouter
+                  </Button>
+                </div>
+              </div>
             </div>
 
           </div>

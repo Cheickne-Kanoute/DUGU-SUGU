@@ -1,73 +1,26 @@
-# React + TypeScript + Vite
+# DUGU SUGU — Application Web de Gestion de Vente de Produits Agricoles
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Plateforme e-commerce pour la commercialisation et la distribution des produits agricoles au Mali.
 
-Currently, two official plugins are available:
+## 🛠️ Stack Technologique
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Frontend** : React.JS + HTML5 + CSS (TailwindCSS) + JavaScript (TypeScript)
+- **Backend / SGBD** : Firebase (Authentication, Firestore, Storage)
+- **Environnement & Outils** : Visual Studio Code, Vite
 
-## React Compiler
+## 📐 Architecture & Fonctionnalités
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. **Modèle de Données & Entités** :
+   - Entités `Paiement` (`mode_paiement`, `montant`, `statut_paiement`) et `Livraison` (`statut_livraison`, `date_livraison`).
+   - Champs `Nom` et `Prénom` séparés à l'inscription et dans la gestion du profil.
+2. **Gestion du Flux de Commande** :
+   - Flux complet : Connexion → Passage de commande → Initiation du paiement → Expédition (Vendeur) → Confirmation de réception (Client) → Validation du paiement.
+3. **Gestion des Rôles & Accès** :
+   - Interfaces et tableaux de bord dédiés pour Clients, Vendeurs (Producteurs) et Administrateurs.
 
-## Expanding the ESLint configuration
+## 🚀 Lancement Rapide
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
+npm run dev
 ```

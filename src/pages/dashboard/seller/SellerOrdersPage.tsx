@@ -6,6 +6,8 @@ import { DashboardSectionHeader } from "@/components/dashboard/shared/DashboardS
 import { OrderStatusBadge } from "@/components/dashboard/shared/OrderStatusBadge";
 import { useAuth } from "@/context/AuthContext";
 import { getOrders, updateOrderStatus, type Order } from "@/lib/api/orders";
+import { createLivraison } from "@/lib/api/livraisons";
+import { sendOrderShippedEmail } from "@/lib/api/email";
 import { toast } from "sonner";
 import { Loader2Icon, PackageIcon } from "lucide-react";
 import {
@@ -43,36 +45,31 @@ export default function SellerOrdersPage() {
   const handleUpdateStatus = async (orderId: string, newStatus: "shipped" | "cancelled" | "delivered") => {
     setUpdatingId(orderId);
     try {
+      // 1. Update Order Status
       await updateOrderStatus(orderId, newStatus);
+
+      if (newStatus === "shipped") {
+        await createLivraison({
+          order_id: orderId,
+          statut_livraison: "en_cours",
+        });
+
+        const targetOrder = orders.find(o => o.id === orderId);
+        if (targetOrder?.buyer?.email) {
+          sendOrderShippedEmail(targetOrder.buyer.email, orderId).catch(() => {});
+        }
+      }
       
       const updatedOrders = orders.map((order) =>
         order.id === orderId ? { ...order, status: newStatus } : order
       );
       setOrders(updatedOrders);
       
-      // Mettre à jour la commande sélectionnée si la modale est ouverte
       if (selectedOrder?.id === orderId) {
         setSelectedOrder({ ...selectedOrder, status: newStatus });
       }
 
-      // Envoyer un email de notification au client
-      const orderToUpdate = orders.find(o => o.id === orderId);
-      if (orderToUpdate?.buyer?.email) {
-        const API_BASE = import.meta.env.VITE_API_URL || '/api';
-        fetch(`${API_BASE}/email/order-status-update`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            buyerEmail: orderToUpdate.buyer.email,
-            buyerName: orderToUpdate.buyer.full_name || 'Client',
-            sellerName: user?.full_name || 'Votre vendeur',
-            orderId: orderId,
-            newStatus: newStatus
-          })
-        }).catch(console.error);
-      }
-
-      toast.success(newStatus === "cancelled" ? "Commande annulée" : "Statut mis à jour");
+      toast.success(newStatus === "cancelled" ? "Commande annulée" : "Commande marquée comme expédiée (Livraison en cours)");
     } catch (err: any) {
       toast.error(err.message || "Erreur de mise à jour");
     } finally {
@@ -103,7 +100,7 @@ export default function SellerOrdersPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Mes commandes</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Gérez vos commandes, consultez les détails et expédiez les produits.
+          Gérez vos commandes, consultez les détails et expédiez les produits (LivrerCommande).
         </p>
       </div>
 
@@ -169,7 +166,7 @@ export default function SellerOrdersPage() {
                           onClick={() => handleUpdateStatus(order.id, "shipped")}
                           disabled={updatingId === order.id}
                         >
-                          {updatingId === order.id ? <Loader2Icon className="h-4 w-4 animate-spin" /> : "Expédier"}
+                          {updatingId === order.id ? <Loader2Icon className="h-4 w-4 animate-spin" /> : "Expédier (Livrer)"}
                         </Button>
                       </div>
                     )}
@@ -185,7 +182,6 @@ export default function SellerOrdersPage() {
         </CardContent>
       </Card>
 
-      {/* Order Details Dialog */}
       <Dialog open={!!selectedOrder} onOpenChange={(open) => !open && setSelectedOrder(null)}>
         <DialogContent className="sm:max-w-[550px]">
           <DialogHeader>
@@ -230,7 +226,7 @@ export default function SellerOrdersPage() {
                 <h4 className="font-semibold mb-3">Articles commandés</h4>
                 <div className="space-y-3">
                   {selectedOrder.items?.map((item: any) => (
-                    <div key={item.id} className="flex gap-3">
+                    <div key={item.id || item.product_id} className="flex gap-3">
                       <div className="h-12 w-12 rounded bg-muted flex items-center justify-center shrink-0">
                         {item.product?.images && item.product.images.length > 0 ? (
                           <img src={item.product.images[0]} alt={item.product.name} className="h-full w-full object-cover rounded" />
@@ -239,7 +235,7 @@ export default function SellerOrdersPage() {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{item.product?.name || 'Produit inconnu'}</p>
+                        <p className="text-sm font-medium truncate">{item.product?.name || 'Produit'}</p>
                         <p className="text-xs text-muted-foreground">Qté: {item.quantity} × {formatCurrency(item.price_at_time)}</p>
                       </div>
                       <div className="text-right">
@@ -255,7 +251,6 @@ export default function SellerOrdersPage() {
                 <span className="font-bold text-xl text-emerald-600">{formatCurrency(Number(selectedOrder.total))}</span>
               </div>
 
-              {/* Actions dans la modale */}
               {(selectedOrder.status === "pending" || selectedOrder.status === "processing") && (
                 <div className="flex gap-3 pt-4 border-t">
                   <Button

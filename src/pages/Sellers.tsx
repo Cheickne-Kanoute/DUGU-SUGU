@@ -23,7 +23,7 @@ export default function Sellers() {
   }, []);
 
   const filteredSellers = sellers.filter(seller => 
-    seller.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (seller.full_name || `${seller.prenom || ''} ${seller.nom || ''}`).toLowerCase().includes(searchQuery.toLowerCase()) ||
     (seller.location && seller.location.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
@@ -74,7 +74,7 @@ export default function Sellers() {
                         <img src={seller.avatar_url} alt={seller.full_name} className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-2xl font-bold text-[#166534]">
-                          {seller.full_name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
+                          {(seller.full_name || `${seller.prenom || ''} ${seller.nom || ''}` || 'Vendeur').split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
                         </span>
                       )}
                     </div>

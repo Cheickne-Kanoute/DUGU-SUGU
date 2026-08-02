@@ -1,67 +1,61 @@
-import { supabase } from '../supabase';
-import type { Database } from '../../types/database';
+import { doc, getDoc, getDocs, collection, query, where, updateDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+import type { UserProfile } from '../../types/database';
 
-export type Profile = Database['public']['Tables']['profiles']['Row'];
+export type Profile = UserProfile;
 export type ProfileWithAccessState = Profile & {
   is_blocked?: boolean;
 };
 
-export async function getProfileById(id: string, accessToken?: string) {
-  // Get the public profile
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    throw new Error(error.message || 'Profile not found');
+export async function getProfileById(id: string, _accessToken?: string) {
+  const snap = await getDoc(doc(db, 'users', id));
+  if (!snap.exists()) {
+    throw new Error('Profile not found');
   }
-
-  const profileWithAccessState = { ...(data as Profile), is_blocked: false } as ProfileWithAccessState;
-
-  // Check if session is still valid (banned users will fail this check)
-  if (accessToken) {
-    const { error: authError } = await supabase.auth.getUser(accessToken);
-    if (authError) {
-      profileWithAccessState.is_blocked = true;
-    }
-  }
-
-  return profileWithAccessState;
+  const data = snap.data() as UserProfile;
+  return {
+    ...data,
+    id: snap.id,
+    full_name: data.full_name || `${data.prenom || ''} ${data.nom || ''}`.trim(),
+    created_at: data.created_at || data.createdAt,
+    updated_at: data.updated_at || data.updatedAt,
+  } as ProfileWithAccessState;
 }
 
 export async function getSellers() {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('role', 'seller')
-    .order('rating', { ascending: false });
-
-  if (error) throw error;
-  return data as Profile[];
+  const q = query(collection(db, 'users'), where('role', '==', 'seller'));
+  const querySnap = await getDocs(q);
+  return querySnap.docs.map(d => {
+    const data = d.data() as UserProfile;
+    return {
+      ...data,
+      id: d.id,
+      full_name: data.full_name || `${data.prenom || ''} ${data.nom || ''}`.trim(),
+    };
+  });
 }
 
 export async function getSellerById(id: string) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', id)
-    .eq('role', 'seller')
-    .single();
-
-  if (error) throw error;
-  return data as Profile;
+  const snap = await getDoc(doc(db, 'users', id));
+  if (!snap.exists() || snap.data().role !== 'seller') {
+    throw new Error('Vendeur non trouvé');
+  }
+  const data = snap.data() as UserProfile;
+  return {
+    ...data,
+    id: snap.id,
+    full_name: data.full_name || `${data.prenom || ''} ${data.nom || ''}`.trim(),
+  };
 }
 
-export async function updateProfile(id: string, updates: Database['public']['Tables']['profiles']['Update']) {
-  const { data, error } = await supabase
-    .from('profiles')
-    .update(updates as never)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+export async function updateProfile(id: string, updates: Partial<UserProfile>) {
+  const userRef = doc(db, 'users', id);
+  const payload = {
+    ...updates,
+    updatedAt: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  await updateDoc(userRef, payload);
+  const updatedSnap = await getDoc(userRef);
+  return { id, ...updatedSnap.data() };
 }

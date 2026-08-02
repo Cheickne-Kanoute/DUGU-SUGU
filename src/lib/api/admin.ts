@@ -1,68 +1,79 @@
-import { supabase } from '../supabase';
+import { 
+  collection, doc, getDoc, getDocs, addDoc, updateDoc 
+} from 'firebase/firestore';
+import { db, auth } from '../firebase';
+import type { DemandeVendeur, UserProfile } from '../../types/database';
 
-export interface SellerRequest {
-  id: string;
-  user_id: string;
-  status: 'pending' | 'approved' | 'rejected';
-  message: string;
-  created_at: string;
-  profiles: {
+export type SellerRequest = DemandeVendeur & {
+  profiles?: {
     full_name: string;
     email: string;
   };
-}
+};
 
 export async function createSellerRequest(message: string) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error('Non authentifié');
 
-  const { data, error } = await supabase
-    .from('seller_requests')
-    .insert({
-      user_id: user.id,
-      message
-    } as any)
-    .select()
-    .single();
+  const now = new Date().toISOString();
+  const payload = {
+    user_id: currentUser.uid,
+    userId: currentUser.uid,
+    message,
+    status: 'pending',
+    statut: 'pending',
+    created_at: now,
+    createdAt: now,
+  };
 
-  if (error) throw error;
-  return data;
+  const docRef = await addDoc(collection(db, 'demandesVendeur'), payload);
+  return { id: docRef.id, ...payload };
 }
 
 export async function getSellerRequests() {
-  const { data, error } = await supabase
-    .from('seller_requests')
-    .select(`
-      *,
-      profiles!seller_requests_user_id_fkey (
-        full_name,
-        email
-      )
-    `)
-    .order('created_at', { ascending: false });
+  const snap = await getDocs(collection(db, 'demandesVendeur'));
 
-  if (error) throw error;
-  return data as any[];
+  const requests = await Promise.all(snap.docs.map(async (d) => {
+    const data = d.data() as DemandeVendeur;
+    const req: SellerRequest = {
+      ...data,
+      id: d.id,
+      user_id: data.user_id || data.userId || '',
+      status: data.status || data.statut || 'pending',
+      created_at: data.created_at || data.createdAt || new Date().toISOString(),
+    };
+
+    if (req.user_id) {
+      try {
+        const uSnap = await getDoc(doc(db, 'users', req.user_id));
+        if (uSnap.exists()) {
+          const uData = uSnap.data() as UserProfile;
+          req.profiles = {
+            full_name: uData.full_name || `${uData.prenom || ''} ${uData.nom || ''}`.trim(),
+            email: uData.email || '',
+          };
+        }
+      } catch (e) {}
+    }
+
+    return req;
+  }));
+
+  return requests.sort((a, b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime());
 }
 
 export async function approveSellerRequest(requestId: string, userId: string) {
-  // We need to call the secure RPC function to promote the user
-  const { error: rpcError } = await supabase.rpc('promote_to_seller', {
-    user_to_promote: userId,
-    request_id: requestId
-  } as any);
-
-  if (rpcError) throw rpcError;
+  const now = new Date().toISOString();
+  // 1. Update seller_request status
+  await updateDoc(doc(db, 'demandesVendeur', requestId), { status: 'approved', statut: 'approved' });
+  // 2. Promote user to seller role
+  await updateDoc(doc(db, 'users', userId), { role: 'seller', updatedAt: now });
   return true;
 }
 
 export async function rejectSellerRequest(requestId: string) {
-  const { data, error } = await (supabase.from('seller_requests') as any)
-    .update({ status: 'rejected' })
-    .eq('id', requestId)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+  const reqRef = doc(db, 'demandesVendeur', requestId);
+  await updateDoc(reqRef, { status: 'rejected', statut: 'rejected' });
+  const snap = await getDoc(reqRef);
+  return { id: requestId, ...snap.data() };
 }

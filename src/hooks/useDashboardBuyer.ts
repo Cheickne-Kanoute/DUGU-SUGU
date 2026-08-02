@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/context/AuthContext';
 
 interface BuyerDashboardData {
@@ -19,7 +20,7 @@ export function useDashboardBuyer() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user || user.role !== 'client') {
+    if (!user) {
       setIsLoading(false);
       return;
     }
@@ -31,67 +32,23 @@ export function useDashboardBuyer() {
       setError(null);
 
       try {
-        const [
-          { data: ordersData, error: ordersError },
-          { data: recentOrdersData, error: recentOrdersError },
-          { count: favoritesCount, error: favCountError },
-          { data: favoritesData, error: favoritesError }
-        ] = await Promise.all([
-          // All orders for this buyer
-          supabase.from('orders')
-            .select('total, status')
-            .eq('buyer_id', user!.id),
-          
-          // Recent orders
-          supabase.from('orders')
-            .select(`
-              id,
-              total,
-              status,
-              created_at,
-              seller:profiles!orders_seller_id_fkey(full_name)
-            `)
-            .eq('buyer_id', user!.id)
-            .order('created_at', { ascending: false })
-            .limit(10),
-            
-          // Favorites count
-          supabase.from('favorites')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', user!.id),
-            
-          // Recent favorites with product info
-          supabase.from('favorites')
-            .select(`
-              id,
-              product:products (
-                id,
-                name,
-                price,
-                images
-              )
-            `)
-            .eq('user_id', user!.id)
-            .order('created_at', { ascending: false })
-            .limit(6)
+        const [ordersSnap, favoritesSnap] = await Promise.all([
+          getDocs(query(collection(db, 'commandes'), where('buyer_id', '==', user!.id))),
+          getDocs(query(collection(db, 'favoris'), where('user_id', '==', user!.id))),
         ]);
-
-        if (ordersError) throw ordersError;
-        if (recentOrdersError) throw recentOrdersError;
-        if (favCountError) throw favCountError;
-        if (favoritesError) throw favoritesError;
 
         if (!isMounted) return;
 
-        const orders = (ordersData as any[]) || [];
+        const orders = ordersSnap.docs.map(d => ({ id: d.id, ...d.data() as any }));
         let totalSpent = 0;
         let activeOrders = 0;
 
         orders.forEach((order: any) => {
-          if (order.status !== 'cancelled') {
+          const status = order.status || order.statut;
+          if (status !== 'cancelled') {
             totalSpent += Number(order.total) || 0;
           }
-          if (['pending', 'processing', 'shipped'].includes(order.status)) {
+          if (['pending', 'processing', 'shipped'].includes(status)) {
             activeOrders++;
           }
         });
@@ -100,10 +57,10 @@ export function useDashboardBuyer() {
           kpis: {
             totalSpent,
             activeOrders,
-            favoritesCount: favoritesCount || 0,
+            favoritesCount: favoritesSnap.size,
           },
-          recentOrders: recentOrdersData || [],
-          favorites: favoritesData || [],
+          recentOrders: orders.slice(0, 10),
+          favorites: favoritesSnap.docs.map(d => ({ id: d.id, ...d.data() as any })),
         });
 
       } catch (err: any) {

@@ -6,10 +6,11 @@ export const loginSchema = z.object({
 });
 
 export const registerSchema = z.object({
-  full_name: z.string().min(2, 'Nom trop court').max(100),
+  nom: z.string().min(2, 'Le nom doit faire au moins 2 caractères').max(50),
+  prenom: z.string().min(2, 'Le prénom doit faire au moins 2 caractères').max(50),
   email: z.string().email('Email invalide'),
   phone: z.string().regex(/^\+?[0-9]{8,15}$/, 'Numéro invalide').optional().or(z.literal('')),
-  password: z.string().min(6, 'Minimum 6 caractères'), // Simplified for demo to match previous logic
+  password: z.string().min(6, 'Minimum 6 caractères'),
   confirmPassword: z.string(),
 }).refine(d => d.password === d.confirmPassword, {
   message: 'Les mots de passe ne correspondent pas',
@@ -26,7 +27,8 @@ export const productSchema = z.object({
 });
 
 export const profileSchema = z.object({
-  full_name: z.string().min(2, 'Le nom est trop court').max(100),
+  nom: z.string().min(2, 'Le nom est trop court').max(50),
+  prenom: z.string().min(2, 'Le prénom est trop court').max(50),
   phone: z.string().optional().or(z.literal('')),
   bio: z.string().max(500).optional().or(z.literal('')),
 });

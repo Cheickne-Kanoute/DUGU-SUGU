@@ -9,6 +9,7 @@ import {
   PackageIcon,
   LayoutDashboardIcon,
   HeartIcon,
+  UserIcon,
 } from "lucide-react";
 
 export type SidebarNavItem = {
@@ -32,6 +33,11 @@ export const sellerNavGroups: SidebarNavGroup[] = [
         title: "Tableau de bord",
         path: "/dashboard",
         icon: <LayoutGridIcon />,
+      },
+      {
+        title: "Mon Profil",
+        path: "/dashboard/profile",
+        icon: <UserIcon />,
       },
       {
         title: "Commandes",
@@ -67,6 +73,11 @@ export const clientNavGroups: SidebarNavGroup[] = [
         icon: <LayoutGridIcon />,
       },
       {
+        title: "Mon Profil",
+        path: "/dashboard/profile",
+        icon: <UserIcon />,
+      },
+      {
         title: "Mon Panier",
         path: "/cart",
         icon: <ShoppingCartIcon />,
@@ -95,6 +106,11 @@ export const adminNavGroups: SidebarNavGroup[] = [
         title: "Vue d'ensemble",
         path: "/admin/overview",
         icon: <LayoutDashboardIcon />,
+      },
+      {
+        title: "Mon Profil",
+        path: "/admin/profile",
+        icon: <UserIcon />,
       },
     ],
   },

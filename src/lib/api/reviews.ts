@@ -1,48 +1,84 @@
-import { supabase } from '../supabase';
-import type { Database } from '../../types/database';
+import { 
+  collection, doc, getDoc, getDocs, addDoc, query, where 
+} from 'firebase/firestore';
+import { db } from '../firebase';
+import type { Avis, UserProfile } from '../../types/database';
 
-export type Review = Database['public']['Tables']['reviews']['Row'] & {
-  buyer?: Database['public']['Tables']['profiles']['Row'];
+export type Review = Avis & {
+  buyer?: UserProfile;
 };
 
 export async function getProductReviews(productId: string) {
-  const { data, error } = await supabase
-    .from('reviews')
-    .select(`
-      *,
-      buyer:buyer_id(full_name, avatar_url)
-    `)
-    .eq('product_id', productId)
-    .order('created_at', { ascending: false });
+  const q = query(
+    collection(db, 'avis'),
+    where('product_id', '==', productId)
+  );
+  const snap = await getDocs(q);
 
-  if (error) throw error;
-  return data as Review[];
+  const reviews = await Promise.all(snap.docs.map(async (d) => {
+    const data = d.data() as Avis;
+    const rev: Review = {
+      ...data,
+      id: d.id,
+      product_id: data.product_id || data.produitId || '',
+      buyer_id: data.buyer_id || data.acheteurId || '',
+      rating: data.rating ?? data.note ?? 5,
+      comment: data.comment || data.commentaire || '',
+      created_at: data.created_at || data.createdAt || new Date().toISOString(),
+    };
+
+    if (rev.buyer_id) {
+      try {
+        const bSnap = await getDoc(doc(db, 'users', rev.buyer_id));
+        if (bSnap.exists()) {
+          const bData = bSnap.data() as UserProfile;
+          rev.buyer = {
+            ...bData,
+            id: bSnap.id,
+            full_name: bData.full_name || `${bData.prenom || ''} ${bData.nom || ''}`.trim(),
+          };
+        }
+      } catch (e) {}
+    }
+
+    return rev;
+  }));
+
+  return reviews.sort((a, b) => new Date(b.created_at!).getTime() - new Date(a.created_at!).getTime());
 }
 
 export async function getSellerReviews(sellerId: string) {
-  // We need to join through products to get reviews for a specific seller
-  const { data, error } = await supabase
-    .from('reviews')
-    .select(`
-      *,
-      buyer:buyer_id(full_name, avatar_url),
-      product:product_id(seller_id)
-    `)
-    .order('created_at', { ascending: false });
+  const snap = await getDocs(collection(db, 'avis'));
+  const allReviews = await Promise.all(snap.docs.map(async (d) => {
+    const data = d.data() as Avis;
+    const prodId = data.product_id || data.produitId;
+    let prodSellerId = '';
+    if (prodId) {
+      try {
+        const pSnap = await getDoc(doc(db, 'produits', prodId));
+        if (pSnap.exists()) {
+          prodSellerId = pSnap.data().seller_id || pSnap.data().vendeurId || '';
+        }
+      } catch (e) {}
+    }
 
-  if (error) throw error;
-  
-  // Filter client-side for now, or use a RPC function in Supabase for better performance
-  return (data as any[]).filter(review => review.product?.seller_id === sellerId);
+    return {
+      ...data,
+      id: d.id,
+      seller_id: prodSellerId,
+    };
+  }));
+
+  return allReviews.filter(r => r.seller_id === sellerId);
 }
 
-export async function createReview(review: Omit<Database['public']['Tables']['reviews']['Insert'], 'id' | 'created_at'>) {
-  const { data, error } = await supabase
-    .from('reviews')
-    .insert([review])
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+export async function createReview(review: Omit<Avis, 'id' | 'created_at'>) {
+  const now = new Date().toISOString();
+  const payload = {
+    ...review,
+    created_at: now,
+    createdAt: now,
+  };
+  const docRef = await addDoc(collection(db, 'avis'), payload);
+  return { id: docRef.id, ...payload };
 }
