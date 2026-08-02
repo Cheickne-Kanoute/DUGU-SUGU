@@ -24,27 +24,49 @@ export async function getProfileById(id: string, _accessToken?: string) {
 
 export async function getSellers() {
   const q = query(collection(db, 'users'), where('role', '==', 'seller'));
-  const querySnap = await getDocs(q);
-  return querySnap.docs.map(d => {
+  const [sellersSnap, productsSnap] = await Promise.all([
+    getDocs(q),
+    getDocs(collection(db, 'produits')),
+  ]);
+
+  const productCountBySeller = new Map<string, number>();
+  productsSnap.docs.forEach(d => {
+    const data = d.data();
+    const sId = data.seller_id || data.vendeurId;
+    if (sId) {
+      productCountBySeller.set(sId, (productCountBySeller.get(sId) || 0) + 1);
+    }
+  });
+
+  return sellersSnap.docs.map(d => {
     const data = d.data() as UserProfile;
+    const count = productCountBySeller.get(d.id) || 0;
     return {
       ...data,
       id: d.id,
       full_name: data.full_name || `${data.prenom || ''} ${data.nom || ''}`.trim(),
+      product_count: count,
+      productCount: count,
     };
   });
 }
 
 export async function getSellerById(id: string) {
   const snap = await getDoc(doc(db, 'users', id));
-  if (!snap.exists() || snap.data().role !== 'seller') {
+  if (!snap.exists()) {
     throw new Error('Vendeur non trouvé');
   }
   const data = snap.data() as UserProfile;
+
+  const prodsQ = query(collection(db, 'produits'), where('seller_id', '==', id));
+  const prodsSnap = await getDocs(prodsQ);
+
   return {
     ...data,
     id: snap.id,
     full_name: data.full_name || `${data.prenom || ''} ${data.nom || ''}`.trim(),
+    product_count: prodsSnap.size,
+    productCount: prodsSnap.size,
   };
 }
 

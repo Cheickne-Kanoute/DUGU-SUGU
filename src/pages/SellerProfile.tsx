@@ -129,7 +129,7 @@ export default function SellerProfile() {
 
               <div className="flex items-center gap-2 text-[#555544]">
                 <Package className="w-4 h-4 text-[#888877]" />
-                <span className="font-semibold">{seller.product_count} Produits</span>
+                <span className="font-semibold">{products.length || seller.product_count || 0} Produits</span>
               </div>
             </div>
 

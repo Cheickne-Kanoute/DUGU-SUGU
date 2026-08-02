@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
+import { toast } from 'sonner';
 import {
   getCart,
   addToCart as addToCartApi,
@@ -39,13 +40,17 @@ export function useCart() {
   }, [refreshCart]);
 
   const addToCart = useCallback(async (productId: string, quantity: number = 1) => {
+    if (user && (user.role === 'seller' || user.role === 'admin')) {
+      toast.error('Seuls les comptes Clients peuvent effectuer des achats.');
+      return;
+    }
     try {
       await addToCartApi(productId, quantity, user?.id);
       window.dispatchEvent(new CustomEvent('cart-updated'));
     } catch (error) {
       console.error('Failed to add to cart', error);
     }
-  }, [user?.id]);
+  }, [user]);
 
   const updateQuantity = useCallback(async (itemId: string, quantity: number) => {
     try {
